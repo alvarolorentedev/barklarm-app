@@ -5,9 +5,11 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
-    setupFiles: './.vitest/setup.ts',
+    setupFiles: './tests-setup.ts',
     coverage: {
       reporter: ['text', 'lcov'],
     },
+    environment: 'jsdom',
+    exclude: ['**/node_modules/**', '**/.hutch/**', '**/dist/**'],
   },
 });

@@ -1,20 +1,24 @@
 {
   "compilerOptions": {
-    "jsx": "react",
-    "allowJs": true,
+    "target": "ES2020",
     "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "noImplicitAny": true,
     "sourceMap": true,
     "baseUrl": ".",
     "outDir": "dist",
-    "moduleResolution": "node",
     "resolveJsonModule": true,
+    "isolatedModules": true,
+    "types": ["vitest/globals"],
     "paths": {
       "*": ["node_modules/*"],
       "@/*": ["./*"]
     }
   },
-  "include": ["src/**/*", "src/global.d.ts"]
+  "include": ["src/**/*", "src/global.d.ts"],
+  "exclude": ["node_modules", "dist"]
 }

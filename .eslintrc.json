@@ -15,10 +15,16 @@
   "parser": "@typescript-eslint/parser",
   "settings": {
     "import/resolver": {
-      "typescript": {}
-    }
+      "typescript": {},
+      "node": {
+        "paths": ["/Users/alvarolorente/.hutch/devkit"]
+      }
+    },
+    "import/ignore": ["electrobun"]
   },
   "rules": {
-    "@typescript-eslint/no-explicit-any": "off"
+    "@typescript-eslint/no-explicit-any": "off",
+    "import/no-unresolved": ["error", { "ignore": ["^electrobun$", "^electrobun/"] }],
+    "import/no-duplicates": "off"
   }
 }

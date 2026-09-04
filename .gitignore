@@ -1,3 +1,14 @@
+# Electrobun / Hutch
+.hutch/
+build/dev-*
+build/*.app
+build/*.dmg
+build/*.zip
+build/*.AppImage
+build/*.snap
+dist/
+.cottontail-tmp/
+
 # Logs
 logs
 *.log

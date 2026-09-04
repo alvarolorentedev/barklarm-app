@@ -5,10 +5,10 @@ import { GrafanaConfiguration } from '../type';
 import { Grafana } from './';
 
 const fetchtMock = vi.fn();
-vi.mock('electron-fetch', () => {
+vi.mock('../../fetch-adapter', () => {
   return {
     __esModule: true,
-    default: (...all: any) => fetchtMock(...all),
+    fetchWrapper: (...all: any) => fetchtMock(...all),
   };
 });
 

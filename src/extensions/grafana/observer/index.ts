@@ -2,7 +2,8 @@ import { State } from '../../../types/State';
 import { Observer } from '../../../types/Observer';
 import { Status } from '../../../types/Status';
 import { GrafanaConfiguration } from '../type';
-import fetch from 'electron-fetch';
+import { fetchWrapper } from '../../fetch-adapter';
+const fetch = fetchWrapper;
 
 export class Grafana extends Observer {
   private readonly url: string;

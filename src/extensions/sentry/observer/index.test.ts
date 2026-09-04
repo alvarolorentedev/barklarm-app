@@ -5,10 +5,10 @@ import { SentryConfiguration } from '../type';
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 
 const fetchtMock = vi.fn();
-vi.mock('electron-fetch', () => {
+vi.mock('../../fetch-adapter', () => {
   return {
     __esModule: true,
-    default: (...all: any) => fetchtMock(...all),
+    fetchWrapper: (...all: any) => fetchtMock(...all),
   };
 });
 

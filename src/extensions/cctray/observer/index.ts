@@ -3,7 +3,8 @@ import { Observer } from '../../../types/Observer';
 import { CCTrayConfiguration } from '../type';
 import { Status } from '../../../types/Status';
 import { XMLParser } from 'fast-xml-parser';
-import fetch from 'electron-fetch';
+import { fetchWrapper } from '../../fetch-adapter';
+const fetch = fetchWrapper;
 
 export class CCTray extends Observer {
   private readonly url: string;

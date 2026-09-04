@@ -1,7 +1,8 @@
 import { State } from '../../../types/State';
 import { Observer } from '../../../types/Observer';
 import { Status } from '../../../types/Status';
-import fetch from 'electron-fetch';
+import { fetchWrapper } from '../../fetch-adapter';
+const fetch = fetchWrapper;
 import { BitbucketConfiguration } from '../type';
 
 export class Bitbucket extends Observer {
