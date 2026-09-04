@@ -52,7 +52,7 @@
     "eslint": "^8.0.1",
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-import": "^2.25.0",
-    "fast-xml-parser": "4.4.1",
+    "fast-xml-parser": "5.7.0",
     "husky": "9.1.4",
     "lint-staged": "15.2.8",
     "luxon": "3.5.0",
@@ -60,10 +60,10 @@
     "prettier": "3.3.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.26.0",
+    "react-router-dom": "7.18.3",
     "typescript": "~4.5.4",
-    "vite": "^5.4.2",
-    "vitest": "^2.0.5"
+    "vite": "^8.2.2",
+    "vitest": "^5.0.0"
   },
   "keywords": [],
   "author": {
@@ -77,14 +77,14 @@
     }
   },
   "dependencies": {
-    "@vitejs/plugin-react": "^4.3.1",
-    "@vitest/coverage-v8": "^2.0.5",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^5.0.0",
     "azure-devops-node-api": "^14.0.2",
     "electrobun": "^2.0.1",
     "jsdom": "^24.1.1",
     "opsgenie-sdk": "^0.5.1",
     "request": "^2.88.2",
-    "vite-plugin-static-copy": "^1.0.6"
+    "vite-plugin-static-copy": "^4.1.1"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.20.0",
