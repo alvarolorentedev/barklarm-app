@@ -27,7 +27,7 @@ Barklarm looks forward to become this one go to application.
 ## Getting Started
 
 Jus follow this simple steps:
-- [downloading barklarm](https://github.com/barklarm/barklarm-app/releases)
+- [downloading barklarm](https://github.com/alvarolorentedev/barklarm-app/releases)
 - install
 - Run
 
