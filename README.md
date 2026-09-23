@@ -51,6 +51,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/pehota"><img src="https://avatars.githubusercontent.com/u/10498221?v=4?s=100" width="100px;" alt="Dimitar Apostolov"/><br /><sub><b>Dimitar Apostolov</b></sub></a><br /><a href="https://github.com/alvarolorentedev/barklarm-app/commits?author=pehota" title="Code">💻</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/ezinneanne"><img src="https://avatars.githubusercontent.com/u/79814820?v=4?s=100" width="100px;" alt="Ezinne Anne Emilia"/><br /><sub><b>Ezinne Anne Emilia</b></sub></a><br /><a href="https://github.com/alvarolorentedev/barklarm-app/commits?author=ezinneanne" title="Documentation">📖</a></td>
       <td align="center" valign="top" width="14.28%"><a href="https://github.com/sergitorrres"><img src="https://avatars.githubusercontent.com/u/40758760?v=4?s=100" width="100px;" alt="Sergi Torres"/><br /><sub><b>Sergi Torres</b></sub></a><br /><a href="https://github.com/alvarolorentedev/barklarm-app/commits?author=sergitorrres" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/skreis"><img src="https://avatars.githubusercontent.com/u/1195199?v=4?s=100" width="100px;" alt="Steve Kreis"/><br /><sub><b>Steve Kreis</b></sub></a><br /><a href="https://github.com/alvarolorentedev/barklarm-app/commits?author=skreis" title="Documentation">📖</a></td>
     </tr>
   </tbody>
 </table>
