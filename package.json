@@ -4,7 +4,7 @@
   "version": "3.0.0",
   "description": "Build & Observability Radiator",
   "main": "src/bun/index.ts",
-  "repository": "https://github.com/barklarm/barklarm-app",
+  "repository": "https://github.com/alvarolorentedev/barklarm-app",
   "contributors": [
     {
       "name": "alvaro",

@@ -4,7 +4,7 @@ import { expect, describe, it } from 'vitest';
 describe('observersfromLinkParser', () => {
   describe.each([
     [
-      'https://github.com/barklarm/barklarm-app/actions/workflows/build.yml',
+      'https://github.com/alvarolorentedev/barklarm-app/actions/workflows/build.yml',
       {
         type: 'githubAction',
         owner: 'barklarm',

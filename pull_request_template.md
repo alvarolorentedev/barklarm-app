@@ -5,7 +5,7 @@ Please take a moment to complete this guide, it helps us to understand the objec
 
 ### Checklist
 
-- [ ] I have follow the [contribution guidelines](https://github.com/barklarm/barklarm-app/blob/main/CONTRIBUTING.md)
+- [ ] I have follow the [contribution guidelines](https://github.com/alvarolorentedev/barklarm-app/blob/main/CONTRIBUTING.md)
 
 ### Description
 
