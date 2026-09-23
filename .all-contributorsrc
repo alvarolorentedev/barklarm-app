@@ -31,11 +31,20 @@
       "contributions": [
         "code"
       ]
+    },
+    {
+      "login": "skreis",
+      "name": "Steve Kreis",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1195199?v=4",
+      "profile": "https://github.com/skreis",
+      "contributions": [
+        "doc"
+      ]
     }
   ],
   "contributorsPerLine": 7,
   "projectName": "barklarm-app",
-  "projectOwner": "Barklarm",
+  "projectOwner": "alvarolorentedev",
   "repoType": "github",
   "repoHost": "https://github.com",
   "skipCi": true,
