@@ -1,37 +1,39 @@
 import * as React from 'react';
+import { Navigate, Route, Routes } from 'react-router-dom';
+import { List, Settings } from 'lucide-react';
+import { AppShell } from './components/AppShell';
 import { Observers } from './pages/Observers';
 import { General } from './pages/General';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import Drawer from './components/Drawer';
-import ApiIcon from '@mui/icons-material/Api';
-import SettingsIcon from '@mui/icons-material/Settings';
+import { SearchProvider } from './search-context';
+import { StatusProvider } from './status-context';
+import { translate } from './i18n';
 
-const menuRoutes: any = [
+const menuRoutes = [
   {
-    name: 'Observers',
+    name: translate('Observers'),
     path: '/observers',
     element: <Observers />,
-    icon: <ApiIcon />,
+    icon: List,
   },
   {
-    name: 'General',
+    name: translate('General'),
     path: '/general',
     element: <General />,
-    icon: <SettingsIcon />,
+    icon: Settings,
   },
 ];
 
-export const App = () => {
-  return (
-    <>
-      <Drawer routes={menuRoutes}>
+export const App = () => (
+  <StatusProvider>
+    <SearchProvider>
+      <AppShell routes={menuRoutes}>
         <Routes>
-          {menuRoutes.map((route: any) => (
-            <Route {...route} />
+          {menuRoutes.map((route) => (
+            <Route key={route.path} path={route.path} element={route.element} />
           ))}
           <Route path="*" element={<Navigate to="/observers" replace />} />
         </Routes>
-      </Drawer>
-    </>
-  );
-};
+      </AppShell>
+    </SearchProvider>
+  </StatusProvider>
+);

@@ -7,7 +7,7 @@ describe('observersfromLinkParser', () => {
       'https://github.com/alvarolorentedev/barklarm-app/actions/workflows/build.yml',
       {
         type: 'githubAction',
-        owner: 'barklarm',
+        owner: 'alvarolorentedev',
         repo: 'barklarm-app',
         workflowId: 'build.yml',
       },

@@ -1,163 +1,174 @@
-import React from 'react';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import TextField from '@mui/material/TextField';
+import React, { useState } from 'react';
+import { ChevronRight, Plus } from 'lucide-react';
 import { observersComponentBuilderMap } from '../../../extensions/observersComponentBuilderMap';
 import { observersTitleBuilderMap } from '../../../extensions/observersTitleBuilderMap';
-import { ObserversParams } from '../../../types/ObserversParams';
 import { observersList } from '../../../extensions/observersList';
-import SpeedDial from '@mui/material/SpeedDial';
-import SpeedDialIcon from '@mui/material/SpeedDialIcon';
-import SpeedDialAction from '@mui/material/SpeedDialAction';
-import SaveIcon from '@mui/icons-material/Save';
-import AddIcon from '@mui/icons-material/Add';
-import CreateIcon from '@mui/icons-material/Create';
-import MuiAccordionSummary, { AccordionSummaryProps } from '@mui/material/AccordionSummary';
-import MuiAccordionDetails from '@mui/material/AccordionDetails';
-import MuiAccordion, { AccordionProps } from '@mui/material/Accordion';
-import { styled } from '@mui/material/styles';
-import ArrowForwardIosSharpIcon from '@mui/icons-material/ArrowForwardIosSharp';
-import IconButton from '@mui/material/IconButton';
-import DeleteIcon from '@mui/icons-material/Delete';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
+import { ObserversParams } from '../../../types/ObserversParams';
+import { State } from '../../../types/State';
+import { StatusPill } from '../StatusPill';
+import Select, { MenuItem } from '../fields/Select';
+import Switch from '../fields/Switch';
+import TextField from '../fields/TextField';
 
-const AccordionDetails = styled(MuiAccordionDetails)(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderTop: '1px solid rgba(0, 0, 0, .125)',
-}));
+type ObserversProps = ObserversParams & {
+  states?: State[];
+  search?: string;
+};
 
-const Accordion = styled((props: AccordionProps) => <MuiAccordion disableGutters elevation={0} square {...props} />)(
-  ({ theme }) => ({
-    border: `1px solid ${theme.palette.divider}`,
-    '&:not(:last-child)': {
-      borderBottom: 0,
-    },
-    '&::before': {
-      display: 'none',
-    },
-  })
-);
+export const Observers = ({
+  observables,
+  add,
+  remove,
+  update,
+  translate,
+  states = [],
+  search = '',
+}: ObserversProps) => {
+  const [expanded, setExpanded] = useState<number | null>(null);
 
-const AccordionSummary = styled((props: AccordionSummaryProps) => (
-  <MuiAccordionSummary expandIcon={<ArrowForwardIosSharpIcon sx={{ fontSize: '0.9rem' }} />} {...props} />
-))(({ theme }) => ({
-  backgroundColor: theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, .05)' : 'rgba(0, 0, 0, .03)',
-  flexDirection: 'row-reverse',
-  '& .MuiAccordionSummary-expandIconWrapper.Mui-expanded': {
-    transform: 'rotate(90deg)',
-  },
-  '& .MuiAccordionSummary-content': {
-    marginLeft: theme.spacing(1),
-  },
-}));
-
-export const Observers = ({ observables, add, remove, update, save, translate }: ObserversParams) => {
-  const actions = [
-    {
-      icon: <SaveIcon />,
-      name: 'Save',
-      onClick: () => {
-        save(observables);
-      },
-    },
-    {
-      icon: <AddIcon />,
-      name: 'New Observer',
-      onClick: () => {
-        add({ type: '' });
-      },
-    },
-  ];
-  const getComponent = (observable: any, index: number, updateFieldWithValue: any): any => {
-    try {
-      return observersComponentBuilderMap[observable.type](observable, index, updateFieldWithValue, translate);
-    } catch (_) {
-      return <></>;
-    }
-  };
   const getTitle = (observable: any): string => {
+    if (!observable.type) return translate('New observer');
     try {
       return observersTitleBuilderMap[observable.type](observable);
-    } catch (_) {
+    } catch {
       return translate('Unkown');
     }
   };
+
+  const getTypeLabel = (type: string): string => {
+    if (!type) return translate('Not configured');
+    return observersList.find((item: any) => item.value === type)?.label || translate('Unkown');
+  };
+
+  const getComponent = (observable: any, index: number): React.ReactNode => {
+    try {
+      return observersComponentBuilderMap[observable.type](observable, index, update, translate);
+    } catch {
+      return null;
+    }
+  };
+
+  const query = search.trim().toLowerCase();
+  const visible = observables
+    .map((observable, index) => ({ observable, index }))
+    .filter(({ observable }) => {
+      if (!query) return true;
+      return (
+        getTitle(observable).toLowerCase().includes(query) ||
+        getTypeLabel(observable.type).toLowerCase().includes(query)
+      );
+    });
+
+  const addObserver = () => {
+    add({ type: '' });
+    setExpanded(observables.length);
+  };
+
+  const removeObserver = (index: number) => {
+    remove(index);
+    setExpanded(null);
+  };
+
   return (
-    <>
-      {observables.map((observable: any, index: number) => (
-        <Accordion key={`observable-accordion-${index}`}>
-          <AccordionSummary aria-controls="panel1a-content" id="panel1a-header">
-            <Typography>{getTitle(observable)}</Typography>
-            <IconButton
-              onClick={() => remove(index)}
-              size="small"
-              sx={{ marginLeft: 'auto', marginRight: 0, padding: '0.15rem' }}
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          </AccordionSummary>
-          <AccordionDetails>
-            <Stack spacing={2}>
-              <Select
-                value={observable.type}
-                label="Observer Type"
-                variant="standard"
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => update('type', index, event.target.value)}
-              >
-                {observersList.map(({ value, label }: any) => (
-                  <MenuItem value={value}>{label}</MenuItem>
-                ))}
-              </Select>
-              {getComponent(observable, index, update)}
-              <TextField
-                label={translate('Alias')}
-                variant="standard"
-                value={observable.alias}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => update('alias', index, event.target.value)}
-              />
-              <TextField
-                label={translate('Issue Creation Endpoint')}
-                variant="standard"
-                value={observable.issueEndpoint}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                  update('issueEndpoint', index, event.target.value)
-                }
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={observable.muted}
-                    onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-                      update('muted', index, event.target.checked)
-                    }
-                  />
-                }
-                label={translate('Muted')}
-              />
-            </Stack>
-          </AccordionDetails>
-        </Accordion>
-      ))}
-      <SpeedDial
-        sx={{
-          margin: 0,
-          top: 'auto',
-          right: 20,
-          bottom: 20,
-          left: 'auto',
-          position: 'fixed',
-        }}
-        color="secondary"
-        ariaLabel="SpeedDial openIcon example"
-        icon={<SpeedDialIcon openIcon={<CreateIcon />} />}
-      >
-        {actions.map((action) => (
-          <SpeedDialAction key={action.name} icon={action.icon} tooltipTitle={action.name} onClick={action.onClick} />
-        ))}
-      </SpeedDial>
-    </>
+    <div className="observers">
+      <div className="observer-table">
+        <div className="observer-table-header">
+          <span className="col-name">{translate('Observer')}</span>
+          <span className="col-type">{translate('Type')}</span>
+          <span className="col-status">{translate('Status')}</span>
+          <span className="col-actions" />
+        </div>
+
+        {observables.length === 0 ? (
+          <div className="observer-empty">
+            <strong>{translate('No observers yet')}</strong>
+            <span>{translate('Add your first source to start monitoring.')}</span>
+          </div>
+        ) : visible.length === 0 ? (
+          <div className="observer-empty">
+            <span>{translate('No observers match your search.')}</span>
+          </div>
+        ) : (
+          visible.map(({ observable, index }) => {
+            const isExpanded = expanded === index;
+            return (
+              <div className="observer-item" key={`observer-${index}`}>
+                <div className={`observer-row${isExpanded ? ' is-expanded' : ''}`}>
+                  <button
+                    type="button"
+                    className="observer-row-main"
+                    aria-expanded={isExpanded}
+                    onClick={() => setExpanded(isExpanded ? null : index)}
+                  >
+                    <span className="observer-name">
+                      <ChevronRight size={14} className="chevron" aria-hidden="true" />
+                      <span className="observer-name-text">{getTitle(observable)}</span>
+                    </span>
+                    <span className="observer-type">{getTypeLabel(observable.type)}</span>
+                    <span className="observer-status">
+                      <StatusPill status={states[index]?.status} />
+                    </span>
+                  </button>
+                  <button type="button" className="observer-remove" onClick={() => removeObserver(index)}>
+                    {translate('Remove')}
+                  </button>
+                </div>
+
+                {isExpanded ? (
+                  <div className="observer-editor">
+                    <div className="observer-editor-grid">
+                      <Select
+                        label={translate('Type')}
+                        value={observable.type || ''}
+                        placeholder={translate('Select a source')}
+                        onChange={(event) => update('type', index, event.target.value)}
+                      >
+                        {observersList.map(({ value, label }: any) => (
+                          <MenuItem key={value} value={value}>
+                            {label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                      <TextField
+                        label={translate('Alias')}
+                        value={observable.alias}
+                        onChange={(event) => update('alias', index, event.target.value)}
+                      />
+                      <TextField
+                        label={translate('Issue Creation Endpoint')}
+                        value={observable.issueEndpoint}
+                        className="field-full"
+                        onChange={(event) => update('issueEndpoint', index, event.target.value)}
+                      />
+                    </div>
+
+                    {observable.type ? (
+                      <div className="observer-form-fields">{getComponent(observable, index)}</div>
+                    ) : (
+                      <p className="observer-hint">{translate('Choose a source type to configure it.')}</p>
+                    )}
+
+                    <div className="observer-editor-footer">
+                      <Switch
+                        label={translate('Muted')}
+                        checked={!!observable.muted}
+                        onChange={(event) => update('muted', index, event.target.checked)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <div className="observer-footer">
+        <button type="button" className="button primary" onClick={addObserver}>
+          <Plus size={14} aria-hidden="true" />
+          {translate('New observer')}
+        </button>
+      </div>
+    </div>
   );
 };

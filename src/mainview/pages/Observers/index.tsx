@@ -1,66 +1,70 @@
 import React, { useEffect, useState } from 'react';
-import Stack from '@mui/material/Stack';
-import Typography from '@mui/material/Typography';
-import Box from '@mui/material/Box';
-import LinkIcon from '@mui/icons-material/Link';
-import { Observers as ObserversComponent } from '../../components/Observers';
+import { Link } from 'lucide-react';
 import { DropZone } from '../../components/Dropzone';
+import { Observers as ObserversComponent } from '../../components/Observers';
+import { PageHeader } from '../../components/PageHeader';
+import { translate } from '../../i18n';
+import { useSearch } from '../../search-context';
+import { useStatus } from '../../status-context';
+import { dragdrop } from './helpers/dragdrop';
 import { mutations } from './helpers/mutations';
 import { storage } from './helpers/storage';
-import { dragdrop } from './helpers/dragdrop';
 
 export const Observers = () => {
   const [observables, setObservables] = useState<any[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [isDrag, setIsDrag] = useState(false);
+  const { states, refresh } = useStatus();
+  const { search } = useSearch();
   const { getObservers, saveObservers } = storage();
 
   useEffect(() => {
-    getObservers().then(setObservables);
+    getObservers().then((observers) => {
+      setObservables(observers);
+      setLoaded(true);
+    });
   }, []);
 
   const { addObserver, removeObserver, updateObserver, parseDataransfer } = mutations(observables, setObservables);
   const { onDragEnter, onDragLeave, onDragOver, onDrop } = dragdrop(setIsDrag, parseDataransfer);
 
   useEffect(() => {
-    if (observables.length > 0 || Array.isArray(observables)) {
-      saveObservers(observables);
+    if (loaded) {
+      saveObservers(observables).then(() => refresh());
     }
-  }, [observables]);
-
-  const translate = (key: string) => key;
+  }, [observables, loaded]);
 
   return (
-    <>
+    <div
+      className="page"
+      data-testid="box"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      <PageHeader
+        title={translate('Observers')}
+        description="Observers watch builds and services. Add a source, set an alias, and Barklarm keeps the tray icon in sync."
+      />
+      <ObserversComponent
+        observables={observables}
+        add={addObserver}
+        update={updateObserver}
+        remove={removeObserver}
+        save={saveObservers}
+        translate={translate}
+        states={states}
+        search={search}
+      />
       {isDrag ? (
         <DropZone open={isDrag} onDragOver={onDragOver} onDrop={onDrop} onDragLeave={onDragLeave}>
-          <Stack
-            sx={{
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-          >
-            <LinkIcon fontSize="large" />
-            <Typography>{translate('Drop Link Here')}</Typography>
-          </Stack>
+          <div className="dropzone-content">
+            <Link size={28} aria-hidden="true" />
+            <span>{translate('Drop Link Here')}</span>
+          </div>
         </DropZone>
-      ) : (
-        <Box
-          onDragEnter={onDragEnter}
-          sx={{
-            minHeight: '100%',
-            height: '95vh',
-          }}
-        >
-          <ObserversComponent
-            observables={observables}
-            add={addObserver}
-            update={updateObserver}
-            remove={removeObserver}
-            save={saveObservers}
-            translate={translate}
-          />
-        </Box>
-      )}
-    </>
+      ) : null}
+    </div>
   );
 };

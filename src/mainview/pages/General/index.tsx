@@ -1,22 +1,17 @@
-import { useState, useEffect } from 'react';
-import Stack from '@mui/material/Stack';
-import Button from '@mui/material/Button';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
-import Divider from '@mui/material/Divider';
+import React, { useEffect, useState } from 'react';
+import { LogOut } from 'lucide-react';
+import { PageHeader } from '../../components/PageHeader';
+import { SettingsGroup, SettingsRow } from '../../components/SettingsGroup';
+import Switch from '../../components/fields/Switch';
+import { translate } from '../../i18n';
 import { storage } from './helpers/storage';
-import TextField from '@mui/material/TextField';
-import LogoutIcon from '@mui/icons-material/Logout';
 
 export const General = () => {
-  const [autoupdate, setAutoupdate] = useState(true);
-  const [sslDisabled, setsslDisabled] = useState(false);
+  const [sslDisabled, setSslDisabled] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(60000);
-  const [issueGlobalEndpoint, setissueGlobalEndpoint] = useState('');
+  const [issueGlobalEndpoint, setIssueGlobalEndpoint] = useState('');
   const [autostart, setAutostart] = useState(true);
   const {
-    getAutoupdate,
-    saveAutoupdate,
     getSslDisabled,
     saveSslDisabled,
     getRefreshInterval,
@@ -31,100 +26,112 @@ export const General = () => {
   } = storage();
 
   useEffect(() => {
-    Promise.all([
-      getAutoupdate(),
-      getSslDisabled(),
-      getRefreshInterval(),
-      getissueGlobalEndpoint(),
-      getAutostart(),
-    ]).then(([au, ssl, ri, ige, as]) => {
-      setAutoupdate(au);
-      setsslDisabled(ssl);
-      setRefreshInterval(ri);
-      setissueGlobalEndpoint(ige);
-      setAutostart(as);
-    });
+    Promise.all([getSslDisabled(), getRefreshInterval(), getissueGlobalEndpoint(), getAutostart()]).then(
+      ([ssl, interval, endpoint, startAtLogin]) => {
+        setSslDisabled(ssl);
+        setRefreshInterval(interval);
+        setIssueGlobalEndpoint(endpoint);
+        setAutostart(startAtLogin);
+      }
+    );
   }, []);
 
-  const translateFn = (key: string) => key;
+  const updateRefreshInterval = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const targetInterval = Number(event.target.value) * 60000;
+    if (!Number.isFinite(targetInterval) || targetInterval < 60000) return;
+    saveRefreshInterval(targetInterval);
+    setRefreshInterval(targetInterval);
+  };
 
   return (
-    <Stack>
-      <Divider sx={{ my: 2 }}>{translateFn('General')}</Divider>
-      <TextField
-        label={translateFn('Refresh Interval (Minutes)')}
-        type="number"
-        variant="standard"
-        value={refreshInterval / 60000}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-          const targetInterval: number = (event.target.value as any) * 60000;
-          if (targetInterval < 60000) return;
-          saveRefreshInterval(targetInterval);
-          setRefreshInterval(targetInterval);
-        }}
+    <div className="page">
+      <PageHeader
+        title={translate('General')}
+        description="Configure how Barklarm refreshes, starts, and stores its data."
       />
-      <TextField
-        label={translateFn('issues Global Endpoint')}
-        type="text"
-        variant="standard"
-        value={issueGlobalEndpoint}
-        onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-          saveissueGlobalEndpoint(event.target.value);
-          setissueGlobalEndpoint(event.target.value);
-        }}
-      />
-      <FormControlLabel
-        control={
+
+      <SettingsGroup title={translate('Monitoring')}>
+        <SettingsRow label={translate('Refresh interval')} description="How often observers are checked.">
+          <div className="number-field">
+            <input
+              className="input input-number"
+              type="number"
+              min={1}
+              value={refreshInterval / 60000}
+              onChange={updateRefreshInterval}
+              aria-label={translate('Refresh interval')}
+            />
+            <span className="input-suffix">{translate('minutes')}</span>
+          </div>
+        </SettingsRow>
+        <SettingsRow
+          label={translate('Issue endpoint')}
+          description="Optional global endpoint used when opening an issue."
+        >
+          <input
+            className="input input-wide"
+            type="text"
+            value={issueGlobalEndpoint}
+            onChange={(event) => {
+              saveissueGlobalEndpoint(event.target.value);
+              setIssueGlobalEndpoint(event.target.value);
+            }}
+            placeholder="https://..."
+            aria-label={translate('Issue endpoint')}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Startup')}>
+        <SettingsRow label={translate('Start at login')} description="Start Barklarm in the tray when you log in.">
           <Switch
             checked={autostart}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            ariaLabel={translate('Start at login')}
+            onChange={(event) => {
               saveAutostart(event.target.checked);
               setAutostart(event.target.checked);
             }}
           />
-        }
-        label={translateFn('Auto Start')}
-      />
-      <FormControlLabel
-        control={
-          <Switch
-            checked={autoupdate}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              saveAutoupdate(event.target.checked);
-              setAutoupdate(event.target.checked);
-            }}
-          />
-        }
-        label={translateFn('Auto Update')}
-      />
-      <Divider sx={{ my: 2 }}>{translateFn('Backup')}</Divider>
-      <Stack spacing={2} direction="row">
-        <Button variant="contained" onClick={() => importConfig()}>
-          {translateFn('Import')}
-        </Button>
-        <Button variant="contained" onClick={() => exportConfig()}>
-          {translateFn('Export')}
-        </Button>
-      </Stack>
-      <Divider sx={{ my: 2 }}>{translateFn('Advanced')}</Divider>
-      <FormControlLabel
-        control={
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Backup')}>
+        <SettingsRow label={translate('Configuration')} description="Import or export your observers and settings.">
+          <div className="button-row">
+            <button type="button" className="button" onClick={() => void importConfig()}>
+              {translate('Import')}
+            </button>
+            <button type="button" className="button" onClick={() => void exportConfig()}>
+              {translate('Export')}
+            </button>
+          </div>
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Advanced')}>
+        <SettingsRow
+          label={translate('Disable SSL verification')}
+          description="Only use this for self-signed certificates. Restart required."
+        >
           <Switch
             checked={sslDisabled}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            ariaLabel={translate('Disable SSL verification')}
+            onChange={(event) => {
               saveSslDisabled(event.target.checked);
-              setsslDisabled(event.target.checked);
+              setSslDisabled(event.target.checked);
             }}
           />
-        }
-        label={translateFn('Disable SSL Check')}
-      />
-      <Divider sx={{ my: 2 }}>{translateFn('Application')}</Divider>
-      <Stack spacing={2} direction="row">
-        <Button variant="contained" color="error" startIcon={<LogoutIcon />} onClick={() => quit()}>
-          {translateFn('Quit Barklarm')}
-        </Button>
-      </Stack>
-    </Stack>
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Application')}>
+        <SettingsRow label={translate('Quit Barklarm')} description="Stop monitoring and close the tray app.">
+          <button type="button" className="button danger" onClick={() => void quit()}>
+            <LogOut size={14} aria-hidden="true" />
+            {translate('Quit')}
+          </button>
+        </SettingsRow>
+      </SettingsGroup>
+    </div>
   );
 };

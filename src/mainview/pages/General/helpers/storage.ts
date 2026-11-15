@@ -1,41 +1,35 @@
 import { client } from '../../../rpc-client';
 
 export const storage = () => ({
-  saveAutoupdate: async (autoupdate: boolean): Promise<void> => {
-    await client.setStore('autoupdate', autoupdate);
-  },
-  getAutoupdate: async (): Promise<boolean> => {
-    return (await client.getStore('autoupdate')) ?? true;
+  getSslDisabled: async (): Promise<boolean> => {
+    return (await client.getStore('sslDisabled')) ?? false;
   },
   saveSslDisabled: async (sslDisabled: boolean): Promise<void> => {
     await client.setStore('sslDisabled', sslDisabled);
   },
-  getSslDisabled: async (): Promise<boolean> => {
-    return (await client.getStore('sslDisabled')) ?? false;
+  getRefreshInterval: async (): Promise<number> => {
+    return (await client.getStore('refreshInterval')) ?? 60000;
   },
   saveRefreshInterval: async (refreshInterval: number): Promise<void> => {
     await client.setStore('refreshInterval', refreshInterval);
   },
-  getRefreshInterval: async (): Promise<number> => {
-    return (await client.getStore('refreshInterval')) ?? 60000;
+  getissueGlobalEndpoint: async (): Promise<string> => {
+    return (await client.getStore('issueGlobalEndpoint')) ?? '';
   },
   saveissueGlobalEndpoint: async (issueGlobalEndpoint?: string): Promise<void> => {
     await client.setStore('issueGlobalEndpoint', issueGlobalEndpoint);
   },
-  getissueGlobalEndpoint: async (): Promise<string> => {
-    return (await client.getStore('issueGlobalEndpoint')) ?? '';
+  getAutostart: async (): Promise<boolean> => {
+    return (await client.getStore('autostart')) ?? true;
   },
   saveAutostart: async (autostart: boolean): Promise<void> => {
     await client.setStore('autostart', autostart);
   },
-  getAutostart: async (): Promise<boolean> => {
-    return (await client.getStore('autostart')) ?? true;
-  },
   importConfig: async (): Promise<boolean> => {
-    return client.importConfig('');
+    return client.importConfig();
   },
   exportConfig: async (): Promise<boolean> => {
-    return client.exportConfig('');
+    return client.exportConfig();
   },
   quit: async (): Promise<boolean> => {
     return client.quit();

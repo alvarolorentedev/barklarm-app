@@ -1,5 +1,5 @@
 import React from 'react';
-import TextField from '@mui/material/TextField';
+import TextField from '../../../mainview/components/fields/TextField';
 
 export const Sentry = ({ observable, index, updateFieldWithValue, translate }: any) => (
   <>

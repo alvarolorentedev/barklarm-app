@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "commonjs",
+    "module": "ESNext",
     "moduleResolution": "node",
     "jsx": "react-jsx",
     "allowJs": true,
@@ -19,6 +19,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["src/**/*", "src/global.d.ts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
 }

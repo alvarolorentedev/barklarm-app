@@ -12,7 +12,12 @@ const stripCrossorigin = () => ({
 export default defineConfig({
   root: 'src/mainview',
   base: './',
+  clearScreen: false,
   plugins: [react(), stripCrossorigin()],
+  server: {
+    port: 1420,
+    strictPort: true,
+  },
   build: {
     outDir: resolve(__dirname, 'dist/mainview'),
     emptyOutDir: true,
@@ -27,8 +32,5 @@ export default defineConfig({
   },
   resolve: {
     preserveSymlinks: true,
-    alias: {
-      electrobun: resolve(__dirname, '.hutch/devkit/api/browser/index.ts'),
-    },
   },
 });

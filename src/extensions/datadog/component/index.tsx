@@ -1,7 +1,7 @@
 import React from 'react';
-import TextField from '@mui/material/TextField';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
+import TextField from '../../../mainview/components/fields/TextField';
+import { MenuItem } from '../../../mainview/components/fields/Select';
+import Select from '../../../mainview/components/fields/Select';
 
 export const DatadogMonitor = ({ observable, index, updateFieldWithValue, translate }: any) => (
   <>

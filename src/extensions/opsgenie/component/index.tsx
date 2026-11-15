@@ -1,7 +1,7 @@
 import React from 'react';
-import TextField from '@mui/material/TextField';
-import Select from '@mui/material/Select';
-import MenuItem from '@mui/material/MenuItem';
+import TextField from '../../../mainview/components/fields/TextField';
+import Select from '../../../mainview/components/fields/Select';
+import { MenuItem } from '../../../mainview/components/fields/Select';
 
 export const Opsgenie = ({ observable, index, updateFieldWithValue, translate }: any) => (
   <>

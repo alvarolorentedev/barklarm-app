@@ -37,6 +37,21 @@ With this next 120 seconds video you will be able to start by yourself.
 
 Further documentation on this project can be found [here](https://www.barklarm.com/docs/intro)
 
+## Development
+
+Barklarm uses [Tauri](https://tauri.app) as a thin native shell and keeps the observers, polling and state management in a platform-neutral TypeScript core. The core lives in `src/core` and `src/extensions`; it has no Tauri or Electron imports, so the same code can be reused by a future Expo app. The desktop UI is React and the Rust shell only handles the window, app lifecycle and config storage.
+
+You need [Bun](https://bun.sh) 1.4+ and the [Rust toolchain](https://rustup.rs).
+
+```sh
+bun install
+bun run dev        # Vite + Tauri dev; opens the settings window
+bun run test       # unit tests
+bun run tsc:check  # type check
+bun run build      # Tauri app and dmg, output in src-tauri/target/release/bundle/
+```
+
+Barklarm starts in the system tray. Choose **Configure** from the tray menu to open the settings window; closing it leaves the app running. Development builds show the window immediately so the UI can be inspected.
 
 ## Contributors ✨
 

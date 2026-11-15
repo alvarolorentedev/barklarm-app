@@ -1,11 +1,12 @@
 # Electrobun / Hutch
 .hutch/
-build/dev-*
+build/*/
 build/*.app
 build/*.dmg
 build/*.zip
 build/*.AppImage
 build/*.snap
+artifacts/
 dist/
 .cottontail-tmp/
 
@@ -98,9 +99,6 @@ typings/
 
 # Vite
 .vite/
-
-# Electron-Forge
-out/
 
 # Intellij IDEA
 .idea/

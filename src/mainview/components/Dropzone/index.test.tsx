@@ -8,20 +8,12 @@ import { DropZone } from './index';
 import { faker } from '@faker-js/faker';
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 
-vi.mock('@mui/material/Backdrop', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`backdrop`} {...props} />,
-}));
-vi.mock('@mui/material/Box', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`box`} {...props} />,
-}));
-
 describe('dropzone', () => {
   const childrenText = faker.string.uuid();
   const onDragOverMock = vi.fn();
   const onDragLeaveMock = vi.fn();
   const onDropMock = vi.fn();
+
   beforeEach(() => {
     onDragOverMock.mockClear();
     onDragLeaveMock.mockClear();
@@ -32,20 +24,15 @@ describe('dropzone', () => {
       </DropZone>
     );
   });
-  it('should have correct herachy with child', () => {
+
+  it('should have correct hierarchy with child', () => {
     const dropbox = screen.getByTestId('backdrop');
-    expect(dropbox).toHaveAttribute('open');
+    expect(dropbox).toHaveAttribute('data-open', 'true');
     const box = within(dropbox).getByTestId('box');
     expect(within(box).getByText(childrenText)).toBeInTheDocument();
   });
 
   it('should call dragOver on dragOver event', () => {
-    const dropbox = screen.getByTestId('backdrop');
-    fireEvent.dragOver(dropbox);
-    expect(onDragOverMock).toBeCalled();
-  });
-
-  it('should call dragOverMock on dragOver event', () => {
     const dropbox = screen.getByTestId('backdrop');
     fireEvent.dragOver(dropbox);
     expect(onDragOverMock).toBeCalled();

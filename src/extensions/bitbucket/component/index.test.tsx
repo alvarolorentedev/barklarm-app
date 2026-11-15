@@ -8,7 +8,7 @@ import { Bitbucket } from './';
 import { faker } from '@faker-js/faker';
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 
-vi.mock('@mui/material/TextField', () => ({
+vi.mock('../../../mainview/components/fields/TextField', () => ({
   __esModule: true,
   default: (props: any) => <input data-testid={`textField-${props.label}`} {...props} />,
 }));

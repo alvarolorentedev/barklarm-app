@@ -1,20 +1,19 @@
 import { Observer } from '../../../types/Observer';
 import { State } from '../../../types/State';
 import { Status } from '../../../types/Status';
-import { getPersonalAccessTokenHandler, WebApi } from 'azure-devops-node-api';
 import { AzureDevOpsConfiguration } from '../type';
-import { RunResult, RunState } from 'azure-devops-node-api/interfaces/PipelinesInterfaces';
+import { fetchWrapper } from '../../fetch-adapter';
+import { toBase64 } from '../../base64';
 
 export class AzureDevOps extends Observer {
-  private connection: WebApi;
   private project: string;
   private pipelineId: number;
   private orgUrl: string;
+  private authToken: string;
 
   constructor({ authToken, orgUrl, project, pipelineId, alias, issueEndpoint, muted }: AzureDevOpsConfiguration) {
     super(alias || `Azure DevOps: ${orgUrl}/${project}`, issueEndpoint, muted);
-    const authHandler = getPersonalAccessTokenHandler(authToken);
-    this.connection = new WebApi(orgUrl, authHandler);
+    this.authToken = authToken;
     this.orgUrl = orgUrl;
     this.project = project;
     this.pipelineId = pipelineId;
@@ -22,20 +21,34 @@ export class AzureDevOps extends Observer {
 
   public async getState(): Promise<State> {
     try {
-      const buildApi = await this.connection.getPipelinesApi();
-      const results = await buildApi.listRuns(this.project, this.pipelineId);
-      const status = this.getStatus(results[0].state, results[0].result);
+      const baseUrl = this.orgUrl.replace(/\/+$/, '');
+      const project = encodeURIComponent(this.project);
+      const response = await fetchWrapper(
+        `${baseUrl}/${project}/_apis/pipelines/${this.pipelineId}/runs?api-version=7.1`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Basic ${toBase64(`:${this.authToken}`)}`,
+          },
+        }
+      );
+      if (!response.ok) throw new Error('response is invalid');
+      const body = await response.json();
+      const run = body.value?.[0];
+      if (!run) throw new Error('response is invalid');
+
+      const status = this.getStatus(run.state, run.result);
       return {
         name: this.alias,
         status,
-        link: results[0]._links.web.href,
+        link: run._links.web.href,
         muted: this.muted,
         issueEndpoint: this.issueEndpoint,
         error:
           status === Status.FAILURE
             ? {
-                id: results[0].id.toString(),
-                description: `${results[0].name} Workflow Failed`,
+                id: run.id.toString(),
+                description: `${run.name} Workflow Failed`,
               }
             : undefined,
       };
@@ -51,13 +64,10 @@ export class AzureDevOps extends Observer {
     }
   }
 
-  private getStatus(state: RunState, result: RunResult): Status {
-    return state !== RunState.Completed
-      ? Status.CHECKING
-      : result === RunResult.Succeeded
-        ? Status.SUCCESS
-        : result === RunResult.Failed
-          ? Status.FAILURE
-          : Status.NA;
+  private getStatus(state: string, result?: string): Status {
+    if (state !== 'completed') return Status.CHECKING;
+    if (result === 'succeeded') return Status.SUCCESS;
+    if (result === 'failed') return Status.FAILURE;
+    return Status.NA;
   }
 }

@@ -1,47 +1,48 @@
 import { Observer } from '../../../types/Observer';
 import { State } from '../../../types/State';
 import { Status } from '../../../types/Status';
-import opsgenie from 'opsgenie-sdk';
 import { OpsgenieConfiguration } from '../type';
-
-const promisify =
-  (fun: any) =>
-  (...args: any[]) =>
-    new Promise((resolve, reject) =>
-      fun(...args, (error: any, result: any) => (error ? reject(error) : resolve(result)))
-    );
+import { fetchWrapper } from '../../fetch-adapter';
 
 export class Opsgenie extends Observer {
   private host: string;
-  private identifier: any;
+  private identifier: string;
+  private apiKey: string;
 
   constructor({ apiKey, host, identifier, alias, issueEndpoint, muted }: OpsgenieConfiguration) {
     super(alias || `Opsgenie: ${host}/${identifier}`, issueEndpoint, muted);
-    opsgenie.configure({
-      api_key: apiKey,
-      host: `https://api.${host}`,
-    });
     this.host = host;
     this.identifier = identifier;
+    this.apiKey = apiKey;
   }
 
   public async getState(): Promise<State> {
+    const link = `https://app.${this.host}/alert/detail/${this.identifier}/details`;
     try {
-      process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
-      const getAlert = promisify(opsgenie.alertV2.get);
-      const result: any = await getAlert({ identifier: this.identifier, identifierType: 'id' });
-      const status = result.data.status === 'open' ? Status.FAILURE : Status.SUCCESS;
+      const response = await fetchWrapper(
+        `https://api.${this.host}/v2/alerts/${encodeURIComponent(this.identifier)}?identifierType=id`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `GenieKey ${this.apiKey}`,
+          },
+        }
+      );
+      if (!response.ok) throw new Error('response is invalid');
+      const body = await response.json();
+      const alert = body.data;
+      const status = alert.status === 'open' ? Status.FAILURE : Status.SUCCESS;
       return {
         name: this.alias,
         status,
-        link: `https://app.${this.host}/alert/detail/${this.identifier}/details`,
+        link,
         muted: this.muted,
         issueEndpoint: this.issueEndpoint,
         error:
           status === Status.FAILURE
             ? {
-                id: result.data.id,
-                description: result.data.message,
+                id: alert.id,
+                description: alert.message,
               }
             : undefined,
       };
@@ -50,7 +51,7 @@ export class Opsgenie extends Observer {
       return {
         name: this.alias,
         status: Status.NA,
-        link: `https://app.${this.host}/alert/detail/${this.identifier}/details`,
+        link,
         muted: this.muted,
         issueEndpoint: this.issueEndpoint,
       };

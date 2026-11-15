@@ -4,166 +4,99 @@ import { expect, describe, it, vi, beforeEach } from 'vitest';
 import { faker } from '@faker-js/faker';
 import { Status } from '../../../types/Status';
 
-const requestMock = vi.fn();
+const fetchMock = vi.fn();
 
-vi.mock('octokit', () => {
-  return {
-    Octokit: vi.fn().mockImplementation(() => {
-      return { request: requestMock };
-    }),
-  };
+vi.mock('../../fetch-adapter', () => ({
+  fetchWrapper: (...args: any[]) => fetchMock(...args),
+}));
+
+const reply = (data: any, ok = true) => ({
+  ok,
+  json: () => Promise.resolve(data),
 });
 
 describe('Github Action', () => {
-  describe('getState', () => {
-    let config: GithubActionConfiguration;
-    let observer: GithubAction;
+  let config: GithubActionConfiguration;
+  let observer: GithubAction;
 
-    beforeEach(() => {
-      requestMock.mockClear();
-      config = {
-        type: 'githubAction',
-        authToken: faker.lorem.word(),
-        owner: faker.lorem.word(),
-        repo: faker.lorem.word(),
-        workflowId: faker.lorem.word(),
-        alias: faker.lorem.word(),
-      };
-      observer = new GithubAction(config);
-    });
+  beforeEach(() => {
+    fetchMock.mockClear();
+    config = {
+      type: 'githubAction',
+      authToken: faker.lorem.word(),
+      owner: faker.lorem.word(),
+      repo: faker.lorem.word(),
+      workflowId: faker.lorem.word(),
+      alias: faker.lorem.word(),
+    };
+    observer = new GithubAction(config);
+  });
 
-    it('shoulds return NA status if request return different value than 200', async () => {
-      requestMock.mockReturnValue({
-        status: 400,
-        data: {
-          total_count: faker.random.numeric(),
-        },
-      });
-      const result = await observer.getState();
-      expect(requestMock).toBeCalledWith('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
-        owner: config.owner,
-        repo: config.repo,
-        workflow_id: config.workflowId,
-      });
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.NA,
-        link: `https://github.com/${config.owner}/${config.repo}/actions/`,
-      });
+  it('returns NA when the request fails', async () => {
+    fetchMock.mockResolvedValue(reply({}, false));
+    const result = await observer.getState();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/repos/${config.owner}/${config.repo}/actions/workflows/${config.workflowId}/runs`),
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(result).toEqual({
+      name: config.alias,
+      status: Status.NA,
+      link: `https://github.com/${config.owner}/${config.repo}/actions/`,
     });
-    it('shoulds return NA status if request return no data', async () => {
-      requestMock.mockReturnValue({
-        status: 200,
-        data: {
-          total_count: 0,
-        },
-      });
-      const result = await observer.getState();
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.NA,
-        link: `https://github.com/${config.owner}/${config.repo}/actions/`,
-      });
-    });
-    it('shoulds return CHECKING status if no conclusion yet', async () => {
-      const expectedUrl = faker.internet.url();
-      requestMock.mockReturnValue({
-        status: 200,
-        data: {
-          total_count: 100,
-          workflow_runs: [
-            {
-              conclusion: null,
-              html_url: expectedUrl,
-            },
-          ],
-        },
-      });
-      const result = await observer.getState();
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.CHECKING,
-        link: expectedUrl,
-      });
-    });
-    it('shoulds return SUCCESS status if conclusion is equal to success', async () => {
-      const expectedUrl = faker.internet.url();
-      requestMock.mockReturnValue({
-        status: 200,
-        data: {
-          total_count: 100,
-          workflow_runs: [
-            {
-              conclusion: 'success',
-              html_url: expectedUrl,
-            },
-          ],
-        },
-      });
-      const result = await observer.getState();
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.SUCCESS,
-        link: expectedUrl,
-      });
-    });
-    it('shoulds return FAILURE status if conclusion is different to success', async () => {
-      const expectedName = faker.lorem.sentence();
-      const expectedId = faker.lorem.word();
-      const expectedUrl = faker.internet.url();
-      requestMock.mockReturnValue({
-        status: 200,
-        data: {
-          total_count: 100,
-          workflow_runs: [
-            {
-              id: expectedId,
-              name: expectedName,
-              conclusion: faker.lorem.word(),
-              html_url: expectedUrl,
-            },
-          ],
-        },
-      });
-      const result = await observer.getState();
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.FAILURE,
-        link: expectedUrl,
-        error: {
-          description: `${expectedName} Workflow Failed`,
-          id: expectedId,
-        },
-      });
-    });
-    it('shoulds return NA status if exception thrown', async () => {
-      requestMock.mockRejectedValue('kaboom');
-      const result = await observer.getState();
-      expect(result).toEqual({
-        name: config.alias,
-        status: Status.NA,
-        link: `https://github.com/${config.owner}/${config.repo}/actions/`,
-      });
-    });
+  });
 
-    it('shoulds owner/repo/workflowId if no alias', async () => {
-      const expectedUrl = faker.internet.url();
-      requestMock.mockReturnValue({
-        status: 200,
-        data: {
-          total_count: 100,
-          workflow_runs: [
-            {
-              conclusion: 'success',
-              html_url: expectedUrl,
-            },
-          ],
-        },
-      });
-      config.alias = undefined;
-      observer = new GithubAction(config);
-      const result = await observer.getState();
-      expect(result.name).toEqual(`Github: ${config.owner}/${config.repo}/${config.workflowId}`);
+  it('returns NA when there are no runs', async () => {
+    fetchMock.mockResolvedValue(reply({ total_count: 0, workflow_runs: [] }));
+    const result = await observer.getState();
+    expect(result.status).toBe(Status.NA);
+  });
+
+  it.each([
+    [null, Status.CHECKING],
+    ['success', Status.SUCCESS],
+    ['failure', Status.FAILURE],
+  ])('maps conclusion %s to status %s', async (conclusion, expected) => {
+    const expectedUrl = faker.internet.url();
+    fetchMock.mockResolvedValue(
+      reply({
+        total_count: 1,
+        workflow_runs: [{ conclusion, html_url: expectedUrl, id: 1, name: 'build' }],
+      })
+    );
+    const result = await observer.getState();
+    expect(result.status).toBe(expected);
+    expect(result.link).toBe(expectedUrl);
+  });
+
+  it('adds failure details', async () => {
+    const expectedName = faker.lorem.sentence();
+    const expectedId = faker.number.int();
+    const expectedUrl = faker.internet.url();
+    fetchMock.mockResolvedValue(
+      reply({
+        total_count: 1,
+        workflow_runs: [{ id: expectedId, name: expectedName, conclusion: 'failure', html_url: expectedUrl }],
+      })
+    );
+    const result = await observer.getState();
+    expect(result.error).toEqual({
+      description: `${expectedName} Workflow Failed`,
+      id: expectedId.toString(),
     });
+  });
+
+  it('returns NA when the request throws', async () => {
+    fetchMock.mockRejectedValue('kaboom');
+    const result = await observer.getState();
+    expect(result.status).toBe(Status.NA);
+  });
+
+  it('uses owner/repo/workflowId when no alias is set', async () => {
+    fetchMock.mockResolvedValue(reply({ total_count: 0, workflow_runs: [] }));
+    config.alias = undefined;
+    observer = new GithubAction(config);
+    const result = await observer.getState();
+    expect(result.name).toBe(`Github: ${config.owner}/${config.repo}/${config.workflowId}`);
   });
 });

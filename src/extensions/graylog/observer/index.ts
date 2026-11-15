@@ -3,6 +3,7 @@ import { Observer } from '../../../types/Observer';
 import { Status } from '../../../types/Status';
 import { GraylogConfiguration } from '../type';
 import { fetchWrapper } from '../../fetch-adapter';
+import { toBase64 } from '../../base64';
 const fetch = fetchWrapper;
 
 export class Graylog extends Observer {
@@ -23,7 +24,7 @@ export class Graylog extends Observer {
       const response = await fetch(this.url, {
         method: 'GET',
         headers: {
-          Authorization: `Basic ${btoa(this.username + ':' + this.password)}`,
+          Authorization: `Basic ${toBase64(this.username + ':' + this.password)}`,
         },
       });
       if (!response.ok) throw new Error('response is invalid');

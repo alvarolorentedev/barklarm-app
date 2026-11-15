@@ -3,81 +3,70 @@ import { AzureDevOps } from '.';
 import { expect, describe, it, vi, beforeEach } from 'vitest';
 import { faker } from '@faker-js/faker';
 import { Status } from '../../../types/Status';
-import { RunResult, RunState } from 'azure-devops-node-api/interfaces/PipelinesInterfaces';
 
-const getPersonalAccessTokenHandlerMock = vi.fn();
-const listRunsMock = vi.fn();
-const getPipelinesApiMock = vi.fn().mockReturnValue({
-  listRuns: listRunsMock,
-});
+const fetchMock = vi.fn();
 
-vi.mock('azure-devops-node-api', () => ({
-  getPersonalAccessTokenHandler: () => getPersonalAccessTokenHandlerMock(),
-  WebApi: vi.fn().mockReturnValue({
-    getPipelinesApi: () => getPipelinesApiMock(),
-  }),
+vi.mock('../../fetch-adapter', () => ({
+  fetchWrapper: (...args: any[]) => fetchMock(...args),
 }));
 
+const reply = (data: any, ok = true) => ({
+  ok,
+  json: () => Promise.resolve(data),
+});
+
 describe('Azure DevOps', () => {
-  describe('getState', () => {
-    let config: AzureDevOpsConfiguration;
-    let observer: AzureDevOps;
+  let config: AzureDevOpsConfiguration;
+  let observer: AzureDevOps;
 
-    beforeEach(() => {
-      getPersonalAccessTokenHandlerMock.mockClear();
-      listRunsMock.mockClear();
-      config = {
-        type: 'azureDevOps',
-        authToken: faker.lorem.word(),
-        project: faker.lorem.word(),
-        orgUrl: faker.lorem.word(),
-        pipelineId: faker.number.int(),
-        alias: faker.lorem.word(),
-      };
-      observer = new AzureDevOps(config);
-    });
+  beforeEach(() => {
+    fetchMock.mockClear();
+    config = {
+      type: 'azureDevOps',
+      authToken: faker.lorem.word(),
+      project: faker.lorem.word(),
+      orgUrl: 'https://dev.azure.com/example',
+      pipelineId: faker.number.int(),
+      alias: faker.lorem.word(),
+    };
+    observer = new AzureDevOps(config);
+  });
 
-    const expectedId = faker.lorem.word();
-    const expectedName = faker.lorem.word();
+  const expectedId = '42';
+  const expectedName = 'build';
 
-    describe.each([
-      [RunState.Completed, RunResult.Succeeded, Status.SUCCESS, undefined],
-      [
-        RunState.Completed,
-        RunResult.Failed,
-        Status.FAILURE,
-        {
-          id: expectedId,
-          description: `${expectedName} Workflow Failed`,
-        },
-      ],
-      [RunState.Completed, RunResult.Canceled, Status.NA, undefined],
-      [RunState.Completed, RunResult.Unknown, Status.NA, undefined],
-      [RunState.Canceling, RunResult.Succeeded, Status.CHECKING, undefined],
-      [RunState.InProgress, RunResult.Succeeded, Status.CHECKING, undefined],
-      [RunState.Unknown, RunResult.Succeeded, Status.CHECKING, undefined],
-    ])('%s', (state: RunState, result: RunResult, expected: Status, error: any) => {
-      it(`should return ${expected} when state ${state} and result ${result}`, async () => {
-        const ExpectedApiResult = {
-          state: state,
-          result: result,
-          id: expectedId,
-          name: expectedName,
-          _links: {
-            web: {
-              href: faker.lorem.word(),
-            },
-          },
-        };
-        listRunsMock.mockReturnValue([ExpectedApiResult]);
-        const resultCall = await observer.getState();
-        expect(resultCall).toEqual({
-          name: config.alias,
-          status: expected,
-          link: ExpectedApiResult._links.web.href,
-          error,
-        });
-      });
-    });
+  it('returns NA when the request fails', async () => {
+    fetchMock.mockResolvedValue(reply({}, false));
+    const result = await observer.getState();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/_apis/pipelines/${config.pipelineId}/runs`),
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(result).toEqual({ name: config.alias, status: Status.NA, link: config.orgUrl });
+  });
+
+  it.each([
+    ['completed', 'succeeded', Status.SUCCESS, undefined],
+    ['completed', 'failed', Status.FAILURE, { id: expectedId, description: `${expectedName} Workflow Failed` }],
+    ['completed', 'canceled', Status.NA, undefined],
+    ['completed', 'unknown', Status.NA, undefined],
+    ['canceling', 'succeeded', Status.CHECKING, undefined],
+    ['inProgress', 'succeeded', Status.CHECKING, undefined],
+    ['unknown', 'succeeded', Status.CHECKING, undefined],
+  ])('maps state %s and result %s to %s', async (state, result, expected, error) => {
+    const href = faker.internet.url();
+    fetchMock.mockResolvedValue(
+      reply({
+        value: [{ state, result, id: expectedId, name: expectedName, _links: { web: { href } } }],
+      })
+    );
+    const response = await observer.getState();
+    expect(response).toEqual({ name: config.alias, status: expected, link: href, error });
+  });
+
+  it('returns NA when there are no runs', async () => {
+    fetchMock.mockResolvedValue(reply({ value: [] }));
+    const result = await observer.getState();
+    expect(result.status).toBe(Status.NA);
   });
 });

@@ -1,21 +1,19 @@
-import { Octokit } from 'octokit';
 import { Observer } from '../../../types/Observer';
 import { State } from '../../../types/State';
 import { GithubActionConfiguration } from '../type';
 import { Status } from '../../../types/Status';
+import { fetchWrapper } from '../../fetch-adapter';
 
 export class GithubAction extends Observer {
-  private octokit: Octokit;
   private owner: string;
   private repo: string;
   private workflowId: string;
+  private authToken: string;
   private baseLink: string;
 
   constructor({ authToken, owner, repo, workflowId, alias, issueEndpoint, muted }: GithubActionConfiguration) {
     super(alias || `Github: ${owner}/${repo}/${workflowId}`, issueEndpoint, muted);
-    this.octokit = new Octokit({
-      auth: authToken,
-    });
+    this.authToken = authToken;
     this.owner = owner;
     this.repo = repo;
     this.workflowId = workflowId;
@@ -24,27 +22,33 @@ export class GithubAction extends Observer {
 
   public async getState(): Promise<State> {
     try {
-      const response = await this.octokit.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
-        owner: this.owner,
-        repo: this.repo,
-        workflow_id: this.workflowId,
-      });
-      if (response.status != 200 || response.data.total_count == 0) throw new Error('response is invalid');
-      const { conclusion, html_url } = response.data.workflow_runs[0];
-      console.log(response.data.workflow_runs[0]);
+      const headers: Record<string, string> = {
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      };
+      if (this.authToken) headers.Authorization = `Bearer ${this.authToken}`;
 
-      const status = this.getStatus(conclusion);
+      const response = await fetchWrapper(
+        `https://api.github.com/repos/${this.owner}/${this.repo}/actions/workflows/${this.workflowId}/runs?per_page=1`,
+        { method: 'GET', headers }
+      );
+      if (!response.ok) throw new Error('response is invalid');
+      const data = await response.json();
+      if (data.total_count === 0) throw new Error('response is invalid');
+      const run = data.workflow_runs[0];
+      const status = this.getStatus(run.conclusion);
+
       return {
         name: this.alias,
         status,
-        link: html_url,
+        link: run.html_url,
         muted: this.muted,
         issueEndpoint: this.issueEndpoint,
         error:
           status === Status.FAILURE
             ? {
-                id: response.data.workflow_runs[0].id.toString(),
-                description: `${response.data.workflow_runs[0].name} Workflow Failed`,
+                id: run.id.toString(),
+                description: `${run.name} Workflow Failed`,
               }
             : undefined,
       };
@@ -60,7 +64,7 @@ export class GithubAction extends Observer {
     }
   }
 
-  private getStatus(conclusion: string): Status {
+  private getStatus(conclusion: string | null): Status {
     return conclusion == null ? Status.CHECKING : conclusion === 'success' ? Status.SUCCESS : Status.FAILURE;
   }
 }

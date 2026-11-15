@@ -10,6 +10,6 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
     },
     environment: 'jsdom',
-    exclude: ['**/node_modules/**', '**/.hutch/**', '**/dist/**'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
   },
 });

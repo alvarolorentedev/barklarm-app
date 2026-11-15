@@ -1,56 +1,47 @@
 import { State } from '../../../types/State';
 import { Observer } from '../../../types/Observer';
 import { DetadogMonitorConfiguration } from '../type';
-import { client, v1 } from '@datadog/datadog-api-client';
 import { Status } from '../../../types/Status';
-import { ServerConfiguration } from '@datadog/datadog-api-client/dist/packages/datadog-api-client-common';
-import {
-  OK,
-  WARN,
-  ALERT,
-  IGNORED,
-  NO_DATA,
-  SKIPPED,
-  UNKNOWN,
-} from '@datadog/datadog-api-client/dist/packages/datadog-api-client-v1/models/MonitorOverallStates';
+import { fetchWrapper } from '../../fetch-adapter';
+
+const OVERALL_STATE_MAP: Record<string, Status> = {
+  OK: Status.SUCCESS,
+  Alert: Status.FAILURE,
+  Warn: Status.FAILURE,
+  Ignored: Status.NA,
+  'No Data': Status.NA,
+  Skipped: Status.NA,
+  Unknown: Status.NA,
+};
 
 export class DatadogMonitor extends Observer {
   private readonly site: string;
   private readonly monitorId: number;
-  private readonly apiInstance: v1.MonitorsApi;
+  private readonly apiKey: string;
+  private readonly appKey: string;
 
-  private readonly overalStateMap: any = {
-    [OK]: Status.SUCCESS,
-    [ALERT]: Status.FAILURE,
-    [WARN]: Status.FAILURE,
-    [IGNORED]: Status.NA,
-    [NO_DATA]: Status.NA,
-    [SKIPPED]: Status.NA,
-    [UNKNOWN]: Status.NA,
-  };
   constructor({ alias, site, apiKey, appKey, monitorId, issueEndpoint, muted }: DetadogMonitorConfiguration) {
     super(alias || `Datadog: ${monitorId}`, issueEndpoint, muted);
     this.site = site;
     this.monitorId = monitorId;
-    const configuration: client.Configuration = client.createConfiguration({
-      baseServer: new ServerConfiguration('https://{subdomain}.{site}', {
-        site: site,
-        subdomain: 'api',
-      }),
-      authMethods: {
-        apiKeyAuth: apiKey,
-        appKeyAuth: appKey,
-      },
-    });
-    this.apiInstance = new v1.MonitorsApi(configuration);
+    this.apiKey = apiKey;
+    this.appKey = appKey;
   }
+
   public async getState(): Promise<State> {
     const link = `https://app.${this.site}/monitors/${this.monitorId}`;
     try {
-      const data: v1.Monitor = await this.apiInstance.getMonitor({
-        monitorId: this.monitorId,
+      const response = await fetchWrapper(`https://api.${this.site}/api/v1/monitor/${this.monitorId}`, {
+        method: 'GET',
+        headers: {
+          'DD-API-KEY': this.apiKey,
+          'DD-APPLICATION-KEY': this.appKey,
+        },
       });
-      const status = this.overalStateMap[data.overallState as any];
+      if (!response.ok) throw new Error('response is invalid');
+      const data = await response.json();
+      const state = String(data.overall_state);
+      const status = OVERALL_STATE_MAP[state] ?? OVERALL_STATE_MAP[state.toUpperCase()] ?? Status.NA;
       return {
         name: this.alias,
         status,

@@ -8,7 +8,10 @@ export const dragdrop = (setIsDrag: any, parseDataransfer: any) => {
     onDragLeave: (e: any) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsDrag(false);
+      const nextTarget = e.relatedTarget as Node | null;
+      if (!nextTarget || !e.currentTarget.contains(nextTarget)) {
+        setIsDrag(false);
+      }
     },
     onDragOver: (e: any) => {
       e.preventDefault();

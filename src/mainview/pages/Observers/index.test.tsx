@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import React from 'react';
-import { render, fireEvent, waitFor, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Observers } from './';
 import { faker } from '@faker-js/faker';
@@ -21,35 +21,22 @@ vi.mock('./helpers/mutations', () => ({
 }));
 vi.mock('../../components/Observers', () => ({
   __esModule: true,
-  Observers: (props: any) => <div data-testid={`observers`} {...props} />,
+  Observers: () => <div data-testid="observers" />,
 }));
 vi.mock('../../components/Dropzone', () => ({
   __esModule: true,
-  DropZone: (props: any) => <div data-testid={`dropzone`} {...props} />,
+  DropZone: ({ open, children }: any) => (
+    <div data-testid="dropzone" data-open={open}>
+      {children}
+    </div>
+  ),
 }));
-vi.mock('@mui/icons-material/Link', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`link`} {...props} />,
-}));
-vi.mock('@mui/material/Box', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`box`} {...props} />,
-}));
-vi.mock('@mui/material/Typography', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`typography`} {...props} />,
-}));
-vi.mock('@mui/material/Stack', () => ({
-  __esModule: true,
-  default: (props: any) => <div data-testid={`stack`} {...props} />,
-}));
-
 vi.mock('../../rpc-client', () => ({
   client: {
     getStore: vi.fn().mockResolvedValue([]),
     setStore: vi.fn().mockResolvedValue(undefined),
     refreshObservers: vi.fn().mockResolvedValue(undefined),
-    getTranslate: vi.fn().mockImplementation((key: string) => Promise.resolve(key)),
+    getObserverStates: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -65,32 +52,29 @@ describe('Observers', () => {
     render(<Observers />);
     await waitFor(() => screen.getByTestId('box'));
     const box = screen.getByTestId('box');
-    const observersComponent = within(box).getByTestId('observers');
-    expect(observersComponent).toBeInTheDocument();
+    expect(within(box).getByTestId('observers')).toBeInTheDocument();
   });
 
-  it('should have DropZone on drag', async () => {
+  it('should show drop zone on drag and hide it on leave', async () => {
     render(<Observers />);
     await waitFor(() => screen.getByTestId('box'));
     const box = screen.getByTestId('box');
+
     fireEvent.dragEnter(box, {});
     await waitFor(() => screen.getByTestId('dropzone'));
-    const dropzone = screen.getByTestId('dropzone');
-    expect(dropzone).toHaveAttribute('open');
-    const stack = within(dropzone).getByTestId('stack');
-    const linkIcon = within(stack).getByTestId('link');
-    expect(linkIcon).toHaveAttribute('font-size', 'large');
-    const typography = within(stack).getByTestId('typography');
-    const expectedText = within(typography).getByText('Drop Link Here');
-    expect(linkIcon).toBeInTheDocument();
-    expect(expectedText).toBeInTheDocument();
+    expect(screen.getByTestId('dropzone')).toHaveAttribute('data-open', 'true');
+    expect(screen.getByText('Drop Link Here')).toBeInTheDocument();
+
+    fireEvent.dragLeave(screen.getByTestId('dropzone'));
+    await waitFor(() => expect(screen.queryByTestId('dropzone')).not.toBeInTheDocument());
   });
 
-  it('should hide DropZone on drop', async () => {
+  it('should hide DropZone on drop and parse the link', async () => {
     const expectedDataTransferText = faker.string.uuid();
     render(<Observers />);
     await waitFor(() => screen.getByTestId('box'));
     const box = screen.getByTestId('box');
+
     fireEvent.dragEnter(box);
     await waitFor(() => screen.getByTestId('dropzone'));
     fireEvent.drop(screen.getByTestId('dropzone'), {
@@ -98,22 +82,10 @@ describe('Observers', () => {
         text: expectedDataTransferText,
       },
     });
-    await waitFor(() => screen.getByTestId('box'));
+
+    await waitFor(() => expect(screen.queryByTestId('dropzone')).not.toBeInTheDocument());
     expect(mutationsMock.parseDataransfer).toBeCalledWith({
       text: expectedDataTransferText,
     });
-  });
-
-  it('should hide DropZone on leave', async () => {
-    render(<Observers />);
-    await waitFor(() => screen.getByTestId('box'));
-    const box = screen.getByTestId('box');
-    fireEvent.dragEnter(box);
-    await waitFor(() => screen.getByTestId('dropzone'));
-    fireEvent.dragOver(screen.getByTestId('dropzone'));
-    await waitFor(() => screen.getByTestId('dropzone'));
-    fireEvent.dragLeave(screen.getByTestId('dropzone'));
-    await waitFor(() => screen.getByTestId('box'));
-    expect(screen.getByTestId('box')).toBeInTheDocument();
   });
 });

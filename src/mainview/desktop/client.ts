@@ -1,0 +1,190 @@
+import { invoke } from '@tauri-apps/api/core';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+import {
+  disable as disableAutostart,
+  enable as enableAutostart,
+  isEnabled as isAutostartEnabled,
+} from '@tauri-apps/plugin-autostart';
+import { open, save } from '@tauri-apps/plugin-dialog';
+
+import { BarklarmConfig, DEFAULT_CONFIG, normalizeRefreshInterval } from '../../core/config';
+import { initialize as initializeI18n } from '../../core/i18n';
+import { NotificationManager } from '../../core/notification';
+import { ObserverManager, ObserverPresenter } from '../../core/observer-manager';
+import { setFetchImplementation } from '../../extensions/fetch-adapter';
+import { State } from '../../types/State';
+import { setupAppMenu, TrayPresenter } from './tray';
+
+export type AppRPCClient = {
+  getStore(key: string): Promise<any>;
+  setStore(key: string, value: any): Promise<void>;
+  refreshObservers(): Promise<void>;
+  getObserverStates(): Promise<State[]>;
+  importConfig(): Promise<boolean>;
+  exportConfig(): Promise<boolean>;
+  quit(): Promise<boolean>;
+};
+
+const noopPresenter: ObserverPresenter = {
+  updateImage: () => undefined,
+  updateMenu: () => undefined,
+};
+
+let config: BarklarmConfig = { ...DEFAULT_CONFIG };
+let manager: ObserverManager | null = null;
+let tray: TrayPresenter | null = null;
+let readyPromise: Promise<void> | null = null;
+
+async function loadConfig(): Promise<BarklarmConfig> {
+  const stored = await invoke<BarklarmConfig>('load_config');
+  config = { ...DEFAULT_CONFIG, ...(stored || {}) };
+  return config;
+}
+
+async function saveConfig(): Promise<void> {
+  await invoke('save_config', { config });
+}
+
+async function ensureNotificationPermission(): Promise<boolean> {
+  if (await isPermissionGranted()) return true;
+  return (await requestPermission()) === 'granted';
+}
+
+async function notify(title: string, body: string): Promise<void> {
+  try {
+    if (!(await ensureNotificationPermission())) return;
+    sendNotification({ title, body });
+  } catch (error) {
+    console.error('Notification failed:', error);
+  }
+}
+
+async function applyAutostart(): Promise<void> {
+  if (import.meta.env.DEV) return;
+  try {
+    const enabled = await isAutostartEnabled();
+    if (config.autostart && !enabled) await enableAutostart();
+    if (!config.autostart && enabled) await disableAutostart();
+  } catch (error) {
+    console.error('Autostart update failed:', error);
+  }
+}
+
+async function applyConfig(): Promise<void> {
+  if (!manager) return;
+  manager.setRefreshInterval(normalizeRefreshInterval(config.refreshInterval));
+  tray?.setEndpoint(config.issueGlobalEndpoint || '');
+  await manager.refreshObservers(config.observables || []);
+  await applyAutostart();
+}
+
+async function initialize(): Promise<void> {
+  if (readyPromise) return readyPromise;
+  readyPromise = (async () => {
+    initializeI18n((navigator.language || 'en').slice(0, 2).toLowerCase());
+    await loadConfig();
+
+    setFetchImplementation((url, options) =>
+      tauriFetch(url, {
+        ...(options || {}),
+        ...(config.sslDisabled ? { danger: { acceptInvalidCerts: true, acceptInvalidHostnames: true } } : {}),
+      } as any)
+    );
+
+    const notifications = new NotificationManager((title, body) => {
+      void notify(title, body);
+    });
+    let menuFallback = true;
+    try {
+      menuFallback = !(await invoke<boolean>('menu_images_supported'));
+    } catch (error) {
+      console.error('Failed to query menu image support:', error);
+    }
+    tray = await TrayPresenter.create([], config.issueGlobalEndpoint || '', menuFallback).catch((error) => {
+      console.error('Failed to create tray:', error);
+      return null;
+    });
+    await setupAppMenu().catch((error) => console.error('Failed to set app menu:', error));
+    manager = new ObserverManager(tray || noopPresenter, notifications);
+    manager.start(normalizeRefreshInterval(config.refreshInterval));
+    await manager.refreshObservers(config.observables || []);
+    await applyAutostart();
+
+    if (import.meta.env.DEV) await invoke('show_window');
+  })();
+  return readyPromise;
+}
+
+async function ready(): Promise<void> {
+  await initialize();
+}
+
+async function importConfig(): Promise<boolean> {
+  await ready();
+  const selected = await open({
+    multiple: false,
+    directory: false,
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (typeof selected !== 'string') return false;
+  const imported = await invoke<boolean>('import_config', { path: selected });
+  if (imported) {
+    await loadConfig();
+    await applyConfig();
+    await notify('Import complete', selected);
+  } else {
+    await notify('Import failed', selected);
+  }
+  return imported;
+}
+
+async function exportConfig(): Promise<boolean> {
+  await ready();
+  const selected = await save({
+    defaultPath: 'barklarm-config.json',
+    filters: [{ name: 'JSON', extensions: ['json'] }],
+  });
+  if (!selected) return false;
+  const exported = await invoke<boolean>('export_config', { path: selected });
+  await notify(exported ? 'Export complete' : 'Export failed', selected);
+  return exported;
+}
+
+export const client: AppRPCClient = {
+  async getStore(key: string): Promise<any> {
+    await ready();
+    return (config as any)[key];
+  },
+
+  async setStore(key: string, value: any): Promise<void> {
+    await ready();
+    (config as any)[key] = value;
+    await saveConfig();
+
+    if (key === 'observables') await manager?.refreshObservers(value || []);
+    if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
+    if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
+    if (key === 'autostart') await applyAutostart();
+  },
+
+  async refreshObservers(): Promise<void> {
+    await ready();
+    await manager?.refreshObservers(config.observables || []);
+  },
+
+  async getObserverStates(): Promise<State[]> {
+    await ready();
+    return manager?.getStates() || [];
+  },
+
+  importConfig,
+  exportConfig,
+
+  async quit(): Promise<boolean> {
+    await invoke('quit_app');
+    return true;
+  },
+};
+
+export { initialize };
