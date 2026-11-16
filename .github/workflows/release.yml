@@ -135,6 +135,7 @@ jobs:
           files: |
             artifacts/**/*.dmg
             artifacts/**/*.deb
+            artifacts/**/*.rpm
             artifacts/**/*.AppImage
             artifacts/**/*.msi
             artifacts/**/*.exe

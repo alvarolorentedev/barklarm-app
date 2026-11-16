@@ -93,9 +93,9 @@ brew install --cask alvarolorentedev/tap/barklarm
 
 Download the installer for your platform from the [latest release](https://github.com/alvarolorentedev/barklarm-app/releases/latest):
 
-- **macOS** — `.dmg` (Apple Silicon) or `.zip`
-- **Windows** — `.exe` installer or `.zip`
-- **Linux** — `.deb`, `.rpm` or `.zip`
+- **macOS** — `.dmg` (Apple Silicon or Intel)
+- **Windows** — `.exe` installer or `.msi`
+- **Linux** — `.deb`, `.rpm` or `.AppImage`
 
 Barklarm starts in the system tray. Choose **Configure** from the tray menu to open the settings window; closing it leaves Barklarm running in the background.
 
