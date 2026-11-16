@@ -1,45 +1,129 @@
-# ![barklarm_normal](https://user-images.githubusercontent.com/3071208/167244374-da18da7a-f52a-4f25-aa9e-c71476647c9c.png)
+<p align="center">
+  <img src="docs/media/hero.jpg" alt="Barklarm — build and observability radiator for your menu bar" width="100%" />
+</p>
 
-![GitHub Workflow Status](https://img.shields.io/github/workflow/status/barklarm/barklarm-app/Build%20%26%20Publish)
-![GitHub all releases](https://img.shields.io/github/downloads/barklarm/barklarm-app/total)
-[![All Contributors](https://img.shields.io/badge/all_contributors-1-orange.svg?style=flat-square)](#contributors-)
-[![Maintainability](https://api.codeclimate.com/v1/badges/2722ae6ccb495529d393/maintainability)](https://codeclimate.com/github/barklarm/barklarm-app/maintainability)
-[![Test Coverage](https://api.codeclimate.com/v1/badges/2722ae6ccb495529d393/test_coverage)](https://codeclimate.com/github/barklarm/barklarm-app/test_coverage)
-![GitHub](https://img.shields.io/github/license/barklarm/barklarm-app)
-[![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/kanekotic/endomondo-unofficial-api/graphs/commit-activity)
-[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](https://www.paypal.me/kanekotic/)
+<h1 align="center">One glance. Every build. Every alert.</h1>
 
-## Support Us
+<p align="center">
+  <strong>Barklarm is a native build & observability radiator.</strong><br />
+  It puts the status of your pipelines, monitors and alerts in your menu bar, so you can stop
+  tab-hopping and see what broke from across the room.
+</p>
 
-[![Product Hunt](https://img.shields.io/badge/Product%20Hunt-like-blue?style=for-the-badge)](https://www.producthunt.com/posts/barklarm)
-[![AlternativeTo](https://img.shields.io/badge/alternativeto.net-like-blue?style=for-the-badge)](https://alternativeto.net/software/barklarm/about/)
+<p align="center">
+  <a href="https://github.com/alvarolorentedev/barklarm-app/releases/latest"><img alt="Download Barklarm" src="https://img.shields.io/badge/Download-latest%20release-0a84ff?style=for-the-badge" /></a>
+  <a href="https://www.barklarm.com/"><img alt="Website" src="https://img.shields.io/badge/Website-barklarm.com-19b8c9?style=for-the-badge" /></a>
+  <a href="https://www.barklarm.com/docs/intro"><img alt="Documentation" src="https://img.shields.io/badge/Docs-read%20the%20guide-6e7681?style=for-the-badge" /></a>
+</p>
 
-## Join The Conversation
+<p align="center">
+  <a href="https://github.com/alvarolorentedev/barklarm-app/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/alvarolorentedev/barklarm-app/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/alvarolorentedev/barklarm-app/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/alvarolorentedev/barklarm-app?sort=semver" /></a>
+  <a href="https://github.com/alvarolorentedev/barklarm-app/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/alvarolorentedev/barklarm-app/total" /></a>
+  <a href="https://github.com/alvarolorentedev/barklarm-app/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/alvarolorentedev/barklarm-app?style=social" /></a>
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey" />
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue" />
+</p>
 
-[![Slack](https://img.shields.io/badge/Slack-like-blue?style=for-the-badge)](https://join.slack.com/t/barklarm/shared_invite/zt-1hyocikcy-kMxfq8jsCsSSmuGVkeFrBA)
+<p align="center">
+  <a href="docs/media/barklarm-promo.mp4">
+    <img src="docs/media/demo.gif" alt="Barklarm in action — observers list, integrations, tray menu and notifications" width="860" />
+  </a>
+</p>
 
-## Motivation
+<p align="center"><sub>▶ <a href="docs/media/barklarm-promo.mp4">Watch the 25-second tour</a></sub></p>
 
-There is currently no open source radiator application that is multiplatform and that can be extensible to support diferent platforms (ex. Github actions) that dont support cctray xml format.
+---
 
-Barklarm looks forward to become this one go to application.
+## Why Barklarm?
 
-## Getting Started
+**Reduce cognitive load.** Your CI, monitors and logs already tell you what is happening — in ten different tabs. Barklarm brings them into one calm list and one menu bar icon.
 
-Jus follow this simple steps:
-- [downloading barklarm](https://github.com/alvarolorentedev/barklarm-app/releases)
-- install
-- Run
+**Know before your users do.** Green means good. Red means act. Native notifications and a tray menu put the failure in front of you without another dashboard to watch.
 
-With this next 120 seconds video you will be able to start by yourself.
+**Native, local, yours.** A Tauri app with a Rust shell and a TypeScript core. Your configuration stays on your machine. No account, no server, no notification plumbing to build.
 
-[intro.webm](https://user-images.githubusercontent.com/3071208/189301010-0f467bfa-b5e7-4d7b-99fa-d666fbd290b1.webm)
+## How it works
 
-Further documentation on this project can be found [here](https://www.barklarm.com/docs/intro)
+1. **Add your sources.** Pick an integration or drop in a link. Set an alias so `api — production` reads like a human wrote it.
+2. **Let it run.** Barklarm checks every source on your refresh interval and keeps the tray icon in sync.
+3. **Get on with your day.** Glance at the menu bar. Open the failing build. Barklarm can even open an issue for you.
+
+## Works with your stack
+
+| Build & CI | Monitoring & alerts |
+| --- | --- |
+| [GitHub Actions](https://www.barklarm.com/docs/configuration) | [Datadog](https://www.barklarm.com/docs/configuration) |
+| [Azure DevOps](https://www.barklarm.com/docs/configuration) | [Sentry](https://www.barklarm.com/docs/configuration) |
+| [Bitbucket Pipelines](https://www.barklarm.com/docs/configuration) | [New Relic](https://www.barklarm.com/docs/configuration) |
+| [CCTray](https://www.barklarm.com/docs/configuration) (Jenkins, TeamCity, …) | [Opsgenie](https://www.barklarm.com/docs/configuration) |
+| | [Grafana](https://www.barklarm.com/docs/configuration) (alpha) |
+| | [Graylog](https://www.barklarm.com/docs/configuration) |
+
+CCTray support covers any server that exposes a `cc.xml` feed, so tools like Jenkins, TeamCity and other CCTray-compatible servers work without a Barklarm-specific plugin.
+
+## See it in action
+
+<p align="center">
+  <img src="docs/media/observers.png" alt="Barklarm observers window showing GitHub Actions, Sentry, Datadog, Azure DevOps and CCTray status" width="860" />
+</p>
+
+<details>
+  <summary><strong>More screenshots</strong> — configuration and settings</summary>
+  <br />
+  <p align="center">
+    <img src="docs/media/observers-config.png" alt="Configuring a GitHub Actions observer in Barklarm" width="720" />
+  </p>
+  <p align="center">
+    <img src="docs/media/general.png" alt="Barklarm general settings" width="720" />
+  </p>
+</details>
+
+## Install
+
+**macOS (Homebrew)**
+
+```sh
+brew tap alvarolorentedev/tap
+brew trust --tap alvarolorentedev/tap   # Homebrew 7+
+brew install --cask alvarolorentedev/tap/barklarm
+```
+
+**Everyone else**
+
+Download the installer for your platform from the [latest release](https://github.com/alvarolorentedev/barklarm-app/releases/latest):
+
+- **macOS** — `.dmg` (Apple Silicon) or `.zip`
+- **Windows** — `.exe` installer or `.zip`
+- **Linux** — `.deb`, `.rpm` or `.zip`
+
+Barklarm starts in the system tray. Choose **Configure** from the tray menu to open the settings window; closing it leaves Barklarm running in the background.
+
+## Pricing
+
+**Free. Not “free tier” free. Free.**
+
+Unlimited observers, unlimited integrations, no account and no upsell. Barklarm is open source and built in the open.
+
+If it saves you a bad morning, you can [sponsor the project](https://github.com/sponsors/alvarolorentedev) or leave a star.
+
+## Loved by developers
+
+> Want to stay ahead of the curve? @BarkLarm keeps me informed about system issues before they become major headaches.
+>
+> — **Abel Fernandez** ([@daferpi](https://twitter.com/daferpi))
+
+> Want to know the secret to reducing mean time to detect and mean time to resolve? It starts with having a clear view of your system's alarms!
+>
+> — **Cris Moreiras** ([@CrisMoreiras](https://twitter.com/CrisMoreiras))
+
+> @BarkLarm supports multiple data sources and integrations. Whether it's logs, metrics, or builds — I can connect them all in one place.
+>
+> — **Kevin Mas Ruiz** ([@kmruiz](https://twitter.com/kmruiz))
 
 ## Development
 
-Barklarm uses [Tauri](https://tauri.app) as a thin native shell and keeps the observers, polling and state management in a platform-neutral TypeScript core. The core lives in `src/core` and `src/extensions`; it has no Tauri or Electron imports, so the same code can be reused by a future Expo app. The desktop UI is React and the Rust shell only handles the window, app lifecycle and config storage.
+Barklarm uses [Tauri](https://tauri.app) as a thin native shell and keeps the observers, polling and state management in a platform-neutral TypeScript core. The core lives in `src/core` and `src/extensions`; it has no Tauri or Electron imports, so the same code can be reused by future clients. The desktop UI is React, and the Rust shell only handles the window, app lifecycle and config storage.
 
 You need [Bun](https://bun.sh) 1.4+ and the [Rust toolchain](https://rustup.rs).
 
@@ -51,7 +135,30 @@ bun run tsc:check  # type check
 bun run build      # Tauri app and dmg, output in src-tauri/target/release/bundle/
 ```
 
-Barklarm starts in the system tray. Choose **Configure** from the tray menu to open the settings window; closing it leaves the app running. Development builds show the window immediately so the UI can be inspected.
+Development builds show the settings window immediately so the UI can be inspected. Production builds start in the tray.
+
+The promo video is a separate Remotion project:
+
+```sh
+cd promo
+bun install
+bun run studio    # preview scenes
+bun run check     # verify promo assets
+bun run render    # render out/barklarm-promo.mp4
+```
+
+## Support the project
+
+<p>
+  <a href="https://www.producthunt.com/posts/barklarm"><img alt="Product Hunt" src="https://img.shields.io/badge/Product%20Hunt-like-blue?style=for-the-badge" /></a>
+  <a href="https://alternativeto.net/software/barklarm/about/"><img alt="AlternativeTo" src="https://img.shields.io/badge/alternativeto.net-like-blue?style=for-the-badge" /></a>
+  <a href="https://github.com/sponsors/alvarolorentedev"><img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?style=for-the-badge" /></a>
+</p>
+
+- Website: [barklarm.com](https://www.barklarm.com/)
+- Docs: [barklarm.com/docs/intro](https://www.barklarm.com/docs/intro)
+- Issues and ideas: [GitHub Issues](https://github.com/alvarolorentedev/barklarm-app/issues)
+- Follow along: [@barklarm](https://twitter.com/barklarm)
 
 ## Contributors ✨
 
@@ -77,3 +184,7 @@ Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/d
 <!-- ALL-CONTRIBUTORS-LIST:END -->
 
 This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind are welcome!
+
+## License
+
+[MIT](https://opensource.org/licenses/MIT)
