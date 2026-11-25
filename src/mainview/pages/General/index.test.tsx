@@ -7,6 +7,56 @@ import '@testing-library/jest-dom';
 import { General } from './index';
 import { expect, describe, it, vi } from 'vitest';
 
+vi.mock('../../rpc-client', () => ({
+  client: {
+    getStore: vi.fn().mockResolvedValue(undefined),
+    setStore: vi.fn().mockResolvedValue(undefined),
+    getIntelligenceStatus: vi.fn().mockResolvedValue({
+      mode: 'disabled',
+      model: {
+        id: 'mock',
+        displayName: 'Mock model',
+        version: '1',
+        quantization: 'Q4',
+        fileName: 'mock.gguf',
+        sizeBytes: 1000,
+        sha256: 'x',
+        license: 'Apache-2.0',
+        licenseUrl: '',
+        contextLength: 8192,
+        recommendedContext: 8192,
+        minRamGb: 8,
+        recommendedRamGb: 16,
+        runtimeMinBuild: 1,
+        installed: false,
+        status: 'not_installed',
+      },
+      download: { modelId: 'mock', status: 'idle', receivedBytes: 0, totalBytes: 1000 },
+      runtime: { state: 'stopped' },
+      hardware: {
+        os: 'macOS',
+        arch: 'arm64',
+        totalMemoryBytes: 17179869184,
+        availableMemoryBytes: 8589934592,
+        freeDiskBytes: 34359738368,
+        cpuCount: 8,
+        managedRuntimeSupported: true,
+      },
+      providerConfigured: false,
+      providerKeyPresent: false,
+      consentRequired: false,
+      destinationApproved: false,
+    }),
+    startModelDownload: vi.fn(),
+    cancelModelDownload: vi.fn(),
+    removeModel: vi.fn(),
+    setProviderKey: vi.fn(),
+    deleteProviderKey: vi.fn(),
+    testInferenceProvider: vi.fn(),
+    approveDestination: vi.fn(),
+  },
+}));
+
 vi.mock('./helpers/storage', () => ({
   storage: () => ({
     getSslDisabled: vi.fn().mockResolvedValue(false),

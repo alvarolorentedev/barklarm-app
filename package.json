@@ -1,7 +1,7 @@
 {
   "name": "barklarm",
   "productName": "Barklarm",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Build & Observability Radiator",
   "repository": "https://github.com/alvarolorentedev/barklarm-app",
   "contributors": [
@@ -22,7 +22,7 @@
     "test:cov": "vitest run --coverage",
     "test:dev": "vitest watch",
     "test:e2e": "playwright test",
-    "check": "bun run format:check && bun run lint:check && bun run tsc:check && bun run test:cov && bun run build:renderer && bun run check:mock-isolation",
+    "check": "bun run format:check && bun run lint:check && bun run tsc:check && bun run test:cov && bun run build:renderer && bun run check:mock-isolation && bun run test:evals:mock",
     "check:mock-isolation": "bun scripts/check-mock-isolation.mjs",
     "rust:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
@@ -35,7 +35,11 @@
     "format:check": "prettier --check src e2e playwright.config.ts scripts",
     "lint-staged": "lint-staged",
     "prepare": "husky",
-    "commit": "git add . && cz"
+    "commit": "git add . && cz",
+    "sidecar:fetch": "bun scripts/fetch-llama.ts",
+    "test:evals:mock": "bun scripts/evals/run.ts --mode=mock",
+    "test:evals:local": "bun scripts/evals/run.ts --mode=local",
+    "sidecar:smoke": "bun scripts/smoke-sidecar.ts"
   },
   "devDependencies": {
     "@faker-js/faker": "8.4.1",

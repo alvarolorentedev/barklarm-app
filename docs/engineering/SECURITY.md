@@ -9,7 +9,7 @@ via [../../SECURITY.md](../../SECURITY.md), not a public issue.
 - Source operational data: build logs, deploy status, alert metadata, links.
 - The local config file and explicit exports.
 - The user's machine, through native capabilities and arbitrary HTTP(S) access.
-- Diagnostic evidence and future model prompts.
+- Diagnostic evidence, model prompts, model output, API keys and managed model/runtime artifacts.
 
 ## Trust boundaries
 
@@ -52,7 +52,8 @@ operational data for the exact failed event while the app is running.
   guaranteed anonymous.
 - Evidence is memory-only: 25 failures, 30-minute TTL, 40 items, 20,000 content characters per envelope and 4,000 per
   item. Titles, metadata values, source URLs and limitation codes are separately capped. Evidence is never written to
-  disk, exported, added to `State`, sent to the issue webhook or transmitted to telemetry.
+  disk, exported, added to `State`, sent to the issue webhook or transmitted to telemetry. When intelligence is enabled and
+the destination authorized, evidence is sent only to the selected inference provider.
 - The normalizer strips ANSI/C0/C1 and bidi/zero-width control sequences and redacts recognizable authorization headers,
   bearer values, GitHub tokens, API-key/password assignments, URL credentials, private keys, JWTs and selected cloud
   keys. Configured credential values are removed exactly when their key name marks them as secrets.
@@ -68,6 +69,67 @@ operational data for the exact failed event while the app is running.
 
 Pattern-based redaction is a safety net, not a proof. Encoded, split, transformed or unrecognized secrets may survive.
 Redaction also changes evidence, so the envelope reports `content_redacted` and downgrades completeness to `partial`.
+
+## Intelligence
+
+- Intelligence is opt-in and disabled by default. Enabling it does not enable diagnostic collection.
+- Three modes: disabled, managed local runtime, custom OpenAI-compatible provider. Only the managed runtime is described
+  as local inference controlled by Barklarm.
+- Custom loopback endpoints may use HTTP; non-loopback endpoints require HTTPS. URLs with credentials, query strings or
+  fragments are rejected. Redirects are disabled; Authorization headers are not forwarded.
+- Private and remote destinations require explicit consent. Consent records live in the OS credential store, not the
+  imported config, so an import cannot silently authorize transmission. Imported configurations reset intelligence to
+  disabled; changing the destination/model invalidates consent.
+- Connectivity tests use a model list or a minimal non-evidence prompt. Evidence is never part of a test.
+- API keys use the OS credential store, scoped by destination fingerprint. They are not in config, exports, prompts, logs
+  or fixtures. The renderer holds a key in memory only for the request; this residual renderer-trust boundary is accepted
+  until transport moves to Rust.
+- The context assembler re-sanitizes evidence, strips destructive-command shapes, bounds items and content, and excludes
+  source URLs and unrelated metadata.
+- Validator rejection: unknown citations, malformed schema, oversized fields, credential-like output, destructive
+  commands, wrong observer/failure/fingerprint. At most one repair request. Raw invalid output is never displayed.
+- Model output is rendered as text. Commands are never executed; generated URLs are never auto-opened. Recommendations are
+  not applied automatically.
+- Managed runtime: loopback only, free port, ephemeral token via a mode-0600 file, explicit argument allowlist, no web
+  UI/slots/props/metrics/model retrieval, output discarded, supervised shutdown and bounded inactivity.
+- Models are downloaded only after consent, verified by size/SHA-256 and GGUF header, written through a temporary file and
+  atomically promoted. Downloaded content is never executed.
+- Runtime binaries are pinned by build and per-platform SHA-256, fetched into a gitignored directory and bundled with their
+  licenses. Standard CI does not download models.
+
+Residual risks:
+
+- Prompt injection is mitigated by separation, destructive-command redaction and validation, not solved. Semantic
+  grounding is measured only by the evaluation set.
+- A localhost external runtime can forward data elsewhere; the UI states this.
+- Pattern redaction and output scanning cannot prove that every secret was removed.
+- The renderer holds integration tokens and, briefly, a provider key; a renderer compromise remains high impact.
+- The sidecar and libraries are dynamic; signing/notarization must cover every bundled library before a signed release.
+
+## Phase 2 threat model additions
+
+| Threat | Mitigation | Residual |
+| --- | --- | --- |
+| Prompt injection in logs/evidence | Trusted system instructions separated from JSON evidence; destructive commands redacted; output validation and safety evaluation | A model can still be influenced semantically |
+| Hallucinated causes or files | Citation-required schema; evidence subset checks; human rubric and held-out evaluation | A valid citation does not prove semantic support |
+| Secret reproduction | Evidence sanitization; output credential scan rejects the analysis | Pattern scanning cannot prove removal |
+| External destination manipulation | Scheme/host validation, HTTPS for non-loopback, no URL credentials, no redirects, destination display and consent | User can approve a hostile destination |
+| Imported config enabling remote processing | Consent stored outside config; import cannot create approval | A user can approve manually |
+| Runtime process injection | Fixed executable path, explicit argument allowlist, no shell, Rust-owned spawn | Local user with process rights can still interfere |
+| Local server exposure | Loopback bind, ephemeral token, no web UI/slots/props, output discarded | Other local processes can connect if they learn the token |
+| Runtime supply chain | Pinned build, per-asset SHA-256, HTTPS source, no execution of downloaded content | Upstream compromise remains possible |
+| Corrupted/malicious model | Size/SHA-256, GGUF header, verification marker, runtime parser isolation | Parser vulnerabilities remain possible |
+| Unsafe output rendering | Text-only rendering; no HTML, command or URL execution | User can copy a recommendation manually |
+| Resource exhaustion | Queue/concurrency limits, output/context budgets, timeouts, one runtime slot, idle shutdown | A model can still use significant CPU/memory while active |
+| Untrusted imported configuration | Normalization, consent outside config, no auto-download/auto-inference | Invalid custom endpoints fail closed |
+
+## Content security policy
+
+The Tauri CSP is now set to `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, self/data
+images, `connect-src ipc: http://ipc.localhost`, `object-src 'none'`, `base-uri 'self'` and `frame-ancestors 'none'`.
+A development CSP additionally allows the Vite origin and websocket. The macOS arm64 native bundle builds with this CSP;
+full interactive webview validation on every target remains release work. Any future native capability must be added
+explicitly. The HTTP capability remains broad for user-configured integrations and is a documented accepted risk.
 
 ## SSL verification
 
@@ -85,7 +147,7 @@ personal data in a test, trace or screenshot. CI requires no secrets for validat
 | Finding                                                              | Severity            | Status                                                                                                              |
 | -------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Config and exports store integration tokens in plaintext             | Medium              | Accepted for local-first 3.x; documented. Encrypting at rest is a future decision.                                  |
-| Tauri content security policy is `null`                              | Medium              | Unresolved. Tightening it requires native validation; do not change without a spec and smoke test.                  |
+| CSP is set but not interactively validated on every target          | Medium              | macOS arm64 bundle built; remaining targets require native smoke validation before release.                           |
 | HTTP capability allows any `http(s)` host                            | Medium              | Required for user-configured integrations. Revisit if integrations gain fixed hosts.                                |
 | `react-router` 6.30.6 open-redirect / SSR deserialization advisories | Moderate            | Tracked. App uses `HashRouter` without SSR, reducing exposure; fix requires router major upgrade.                   |
 | `fast-xml-parser` 4.5.7 CPU advisory for unterminated stop-node tags | Low                 | Tracked. CCTray input is user-configured; fix requires parser major upgrade.                                        |
@@ -113,6 +175,8 @@ test the migration.
 - [ ] Logs, tests, fixtures and traces contain no secrets or personal data.
 - [ ] Configuration remains backward compatible and migration is tested.
 - [ ] Mock code cannot reach real configuration or a production bundle.
-- [ ] Diagnostic evidence is opt-in, bounded, sanitized, memory-only and absent from outbound payloads.
+- [ ] Diagnostic evidence is opt-in, bounded, sanitized, memory-only and absent from the issue webhook.
+- [ ] Inference destinations are classified, consent is explicit, redirects are rejected and connectivity tests carry no evidence.
+- [ ] Model output is validated, rendered as text and never executed; citations are subset-checked.
 - [ ] Log redirects and external links cannot carry credentials or execute remote content.
 - [ ] New native permission is least-privilege and documented.

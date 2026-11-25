@@ -1,0 +1,38 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": [
+    "execution",
+    "job:6022",
+    "step:6022:2",
+    "error:6022:0"
+  ],
+  "requiredCategories": [
+    "execution",
+    "job",
+    "step",
+    "error"
+  ],
+  "limitations": [],
+  "forbiddenStrings": [
+    "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  ],
+  "requiredStrings": [
+    "Permission denied (publickey)",
+    "exit code 128"
+  ],
+  "knownLimitations": [
+    "A held-out authentication failure."
+  ],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "The job could not authenticate to the Git remote.",
+      "Check the deploy key or token used by the checkout step."
+    ],
+    "forbiddenClaims": [
+      "The repository does not exist.",
+      "The tests failed."
+    ],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A held-out authentication failure."
+  }
+}

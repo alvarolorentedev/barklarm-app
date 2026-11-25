@@ -105,3 +105,9 @@ typings/
 # Playwright
 playwright-report/
 test-results/
+
+# Pinned native runtime staged by scripts/fetch-llama.mjs
+src-tauri/binaries/
+
+# Evaluation artifacts are review outputs, not committed truth snapshots
+evals/results/

@@ -28,17 +28,20 @@ Goal: capture enough source-specific context to explain a failure without guessw
 
 Phase 1 does not infer causes. It collects and presents trustworthy evidence.
 
-## Phase 2 — Local diagnosis (next)
+## Phase 2 — Local diagnosis (implemented, macOS arm64 validated)
 
 Goal: explain a failure and recommend a next action using a local model.
 
-- Deterministic evaluation harness with sanitized fixtures.
-- Grounded recommendations with citations to evidence.
-- Explicit uncertainty when evidence is insufficient.
-- Secret and prompt-injection resistance tests.
+- [x] Deterministic evaluation harness with sanitized fixtures and a held-out set.
+- [x] Grounded recommendations with validated citations to evidence.
+- [x] Explicit uncertainty and an insufficient-evidence policy.
+- [x] Secret, destructive-command and prompt-injection checks.
+- [x] Built-in llama.cpp runtime, verified GGUF download and custom OpenAI-compatible providers.
+- [x] Opt-in settings, model management and analysis panel.
+- [x] Recorded model selection: Qwen3-1.7B-Instruct Q4_K_M.
 
-Phase 1 evidence, fixture IDs and completeness/limitations signals are the inputs. No model vendor, download mechanism
-or runtime dependency is chosen.
+See [spec 0002](../specs/0002-local-intelligence-engine.md) and [the model report](../evaluations/0001-model-selection.md).
+Other managed-runtime targets still need native smoke validation.
 
 ## Phase 3 — Evaluated assistance
 

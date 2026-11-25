@@ -12,6 +12,8 @@ import {
   BarklarmConfig,
   DEFAULT_CONFIG,
   normalizeConfig,
+  normalizeIntelligenceMode,
+  normalizeIntelligenceProvider,
   normalizeObservables,
   normalizeRefreshInterval,
 } from '../../core/config';
@@ -20,7 +22,19 @@ import { initialize as initializeI18n } from '../../core/i18n';
 import { isHttpUrl } from '../../core/issue';
 import { NotificationManager } from '../../core/notification';
 import { ObserverManager, ObserverPresenter } from '../../core/observer-manager';
+import { AnalysisManager } from '../../core/intelligence/analysis-manager';
+import { destinationFingerprint, validateEndpoint } from '../../core/intelligence/endpoint-policy';
+import { ManagedInferenceProvider } from '../../core/intelligence/providers/managed';
+import { OpenAICompatibleProvider } from '../../core/intelligence/providers/openai-compatible';
 import { setFetchImplementation } from '../../extensions/fetch-adapter';
+import {
+  InferenceError,
+  IntelligenceStatus,
+  ManagedRuntimeEndpoint,
+  ModelInfo,
+  ProviderTestInput,
+  ProviderTestResult,
+} from '../../types/Intelligence';
 import { State } from '../../types/State';
 import type { AppRPCClient } from '../runtime/types';
 import { openExternal as openExternalUrl, setupAppMenu, TrayPresenter } from './tray';
@@ -33,8 +47,30 @@ const noopPresenter: ObserverPresenter = {
 let config: BarklarmConfig = { ...DEFAULT_CONFIG };
 let manager: ObserverManager | null = null;
 let evidence: EvidenceManager | null = null;
+let analysis: AnalysisManager | null = null;
 let tray: TrayPresenter | null = null;
 let readyPromise: Promise<void> | null = null;
+
+function emptyModel(): ModelInfo {
+  return {
+    id: 'unavailable',
+    displayName: 'No managed model',
+    version: '',
+    quantization: '',
+    fileName: '',
+    sizeBytes: 0,
+    sha256: '',
+    license: '',
+    licenseUrl: '',
+    contextLength: 0,
+    recommendedContext: 8192,
+    minRamGb: 0,
+    recommendedRamGb: 0,
+    runtimeMinBuild: 0,
+    installed: false,
+    status: 'not_installed',
+  };
+}
 
 async function loadConfig(): Promise<BarklarmConfig> {
   const stored = await invoke<unknown>('load_config');
@@ -76,13 +112,186 @@ async function applyAutostart(): Promise<void> {
   }
 }
 
+function analysisConfig(): {
+  mode: ReturnType<typeof normalizeIntelligenceMode>;
+  provider: ReturnType<typeof normalizeIntelligenceProvider>;
+} {
+  return {
+    mode: normalizeIntelligenceMode(config.intelligenceMode),
+    provider: normalizeIntelligenceProvider(config.intelligenceProvider),
+  };
+}
+
+async function applyAnalysisConfig(): Promise<void> {
+  if (!analysis) return;
+  const next = analysisConfig();
+  analysis.setDiagnosticsEnabled(Boolean(config.diagnosticsEnabled));
+  analysis.setConfig(next.mode, next.provider);
+  if (next.mode !== 'managed' || !config.diagnosticsEnabled) {
+    await invoke('stop_managed_runtime').catch(() => undefined);
+  }
+  if (analysis.isEnabled() && config.diagnosticsEnabled) {
+    for (const item of evidence?.getAvailableEvidence() || []) analysis.ingest(item);
+  }
+}
+
 async function applyConfig(): Promise<void> {
   if (!manager) return;
   evidence?.setEnabled(Boolean(config.diagnosticsEnabled));
+  await applyAnalysisConfig();
   manager.setRefreshInterval(normalizeRefreshInterval(config.refreshInterval));
   tray?.setEndpoint(config.issueGlobalEndpoint || '');
   await manager.refreshObservers(config.observables || []);
   await applyAutostart();
+}
+
+async function getProviderKey(fingerprint?: string): Promise<string | undefined> {
+  try {
+    const value = await invoke<string | null>('get_provider_key', { fingerprint: fingerprint || '' });
+    return typeof value === 'string' && value ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+async function isDestinationApproved(fingerprint: string): Promise<boolean> {
+  try {
+    return Boolean(await invoke<boolean>('is_destination_approved', { fingerprint }));
+  } catch {
+    return false;
+  }
+}
+
+function inferenceFetch(url: string, options: any): Promise<any> {
+  return tauriFetch(url, {
+    ...(options || {}),
+    ...(config.sslDisabled ? { danger: { acceptInvalidCerts: true, acceptInvalidHostnames: true } } : {}),
+  } as any);
+}
+
+async function createAnalysisProvider(request: {
+  mode: ReturnType<typeof normalizeIntelligenceMode>;
+  provider?: ReturnType<typeof normalizeIntelligenceProvider>;
+}) {
+  const providerConfig = normalizeIntelligenceProvider(request.provider);
+  if (request.mode === 'managed') {
+    return new ManagedInferenceProvider(
+      {
+        ensure: async (_signal, contextWindow) =>
+          invoke<ManagedRuntimeEndpoint>('ensure_managed_runtime', { contextWindow: contextWindow ?? null }),
+      },
+      {
+        timeoutMs: providerConfig.timeoutMs,
+        contextWindow: providerConfig.contextWindow,
+        maxOutputTokens: providerConfig.maxOutputTokens,
+      }
+    );
+  }
+
+  const validation = validateEndpoint(providerConfig.endpoint);
+  if (validation.ok === false) throw new InferenceError('configuration', validation.reason);
+  if (!providerConfig.model) throw new InferenceError('configuration', 'model_missing');
+  const fingerprint = destinationFingerprint(validation.baseUrl, providerConfig.model);
+  if (validation.requiresConsent && !(await isDestinationApproved(fingerprint))) {
+    throw new InferenceError('consent_required');
+  }
+  return new OpenAICompatibleProvider({
+    name: 'Custom OpenAI-compatible provider',
+    endpoint: validation.baseUrl,
+    model: providerConfig.model,
+    apiKey: await getProviderKey(fingerprint),
+    contextWindow: providerConfig.contextWindow,
+    maxOutputTokens: providerConfig.maxOutputTokens,
+    timeoutMs: providerConfig.timeoutMs,
+    fetch: inferenceFetch,
+  });
+}
+
+async function intelligenceStatus(): Promise<IntelligenceStatus> {
+  const mode = normalizeIntelligenceMode(config.intelligenceMode);
+  const provider = normalizeIntelligenceProvider(config.intelligenceProvider);
+  let native: any = null;
+  try {
+    native = await invoke<any>('intelligence_status');
+  } catch (error) {
+    console.error('Intelligence runtime status unavailable:', error);
+  }
+
+  let destination: string | undefined;
+  let consentRequired = false;
+  let destinationApproved = false;
+  if (mode === 'custom') {
+    const validation = validateEndpoint(provider.endpoint);
+    if (validation.ok) {
+      destination = validation.baseUrl;
+      consentRequired = validation.requiresConsent;
+      destinationApproved = consentRequired
+        ? await isDestinationApproved(destinationFingerprint(validation.baseUrl, provider.model || ''))
+        : true;
+    }
+  }
+
+  let providerKeyPresent = false;
+  try {
+    providerKeyPresent = Boolean(
+      await invoke<boolean>('has_provider_key', {
+        fingerprint: destination ? destinationFingerprint(destination, provider.model || '') : '',
+      })
+    );
+  } catch {
+    providerKeyPresent = false;
+  }
+
+  return {
+    mode,
+    model: native?.model || emptyModel(),
+    download: native?.download || {
+      modelId: native?.model?.id || 'unavailable',
+      status: 'idle',
+      receivedBytes: 0,
+      totalBytes: 0,
+    },
+    runtime: native?.runtime || { state: 'failed', error: 'status_unavailable' },
+    hardware: native?.hardware || {
+      os: '',
+      arch: '',
+      totalMemoryBytes: 0,
+      availableMemoryBytes: 0,
+      freeDiskBytes: 0,
+      cpuCount: 0,
+      managedRuntimeSupported: false,
+      reason: 'status_unavailable',
+    },
+    providerConfigured: mode === 'custom' && Boolean(provider.endpoint && provider.model),
+    providerKeyPresent,
+    destination,
+    consentRequired,
+    destinationApproved,
+  };
+}
+
+async function testInferenceProvider(input: ProviderTestInput): Promise<ProviderTestResult> {
+  const validation = validateEndpoint(input.endpoint);
+  if (validation.ok === false) return { ok: false, error: 'configuration' };
+  if (validation.requiresConsent) {
+    const fingerprint = destinationFingerprint(validation.baseUrl, input.model);
+    if (!(await isDestinationApproved(fingerprint))) return { ok: false, error: 'consent_required' };
+  }
+  try {
+    const fingerprint = destinationFingerprint(validation.baseUrl, input.model);
+    const provider = new OpenAICompatibleProvider({
+      name: 'Custom OpenAI-compatible provider',
+      endpoint: validation.baseUrl,
+      model: input.model,
+      apiKey: await getProviderKey(fingerprint),
+      timeoutMs: input.timeoutMs,
+      fetch: inferenceFetch,
+    });
+    await provider.initialize();
+    return await provider.testConnection();
+  } catch (error) {
+    return { ok: false, error: error instanceof InferenceError ? error.code : 'unavailable' };
+  }
 }
 
 async function initialize(): Promise<void> {
@@ -112,7 +321,22 @@ async function initialize(): Promise<void> {
       return null;
     });
     await setupAppMenu().catch((error) => console.error('Failed to set app menu:', error));
-    evidence = new EvidenceManager({ enabled: Boolean(config.diagnosticsEnabled) });
+
+    const next = analysisConfig();
+    analysis = new AnalysisManager({
+      mode: next.mode,
+      provider: next.provider,
+      diagnosticsEnabled: Boolean(config.diagnosticsEnabled),
+      createProvider: createAnalysisProvider,
+    });
+    evidence = new EvidenceManager({
+      enabled: Boolean(config.diagnosticsEnabled),
+      onEvent: (event) => {
+        if (event.type === 'available') analysis?.ingest(event.evidence);
+        else if (event.type === 'cleared') analysis?.clear(event.observerId);
+        else analysis?.clearAll();
+      },
+    });
     manager = new ObserverManager(tray || noopPresenter, notifications, undefined, evidence);
     manager.start(normalizeRefreshInterval(config.refreshInterval));
     await manager.refreshObservers(config.observables || []);
@@ -138,6 +362,9 @@ async function importConfig(): Promise<boolean> {
   const imported = await invoke<boolean>('import_config', { path: selected });
   if (imported) {
     await loadConfig();
+    // Imported configuration is data, not explicit inference consent.
+    config = { ...config, intelligenceMode: 'disabled' };
+    await saveConfig();
     await applyConfig();
     await notify('Import complete', selected);
   } else {
@@ -169,17 +396,22 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
 
     async setStore(key: string, value: any): Promise<void> {
       await ready();
-      config =
-        key === 'observables'
-          ? { ...config, observables: normalizeObservables(value) }
-          : ({ ...config, [key]: value } as BarklarmConfig);
+      if (key === 'observables') config = { ...config, observables: normalizeObservables(value) };
+      else if (key === 'intelligenceMode') config = { ...config, intelligenceMode: normalizeIntelligenceMode(value) };
+      else if (key === 'intelligenceProvider')
+        config = { ...config, intelligenceProvider: normalizeIntelligenceProvider(value) };
+      else config = { ...config, [key]: value } as BarklarmConfig;
       await saveConfig();
 
       if (key === 'observables') await manager?.refreshObservers(config.observables || []);
       if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
       if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
-      if (key === 'diagnosticsEnabled') evidence?.setEnabled(Boolean(value));
       if (key === 'autostart') await applyAutostart();
+      if (key === 'diagnosticsEnabled') {
+        evidence?.setEnabled(Boolean(value));
+        await applyAnalysisConfig();
+      }
+      if (key === 'intelligenceMode' || key === 'intelligenceProvider') await applyAnalysisConfig();
     },
 
     async refreshObservers(): Promise<void> {
@@ -202,6 +434,65 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       evidence?.recollect(observerId);
     },
 
+    async getAnalysis(observerId: string) {
+      await ready();
+      return analysis?.getSnapshot(observerId) ?? { status: 'disabled' as const };
+    },
+
+    async reanalyze(observerId: string): Promise<void> {
+      await ready();
+      analysis?.reanalyze(observerId);
+    },
+
+    getIntelligenceStatus: intelligenceStatus,
+
+    async startModelDownload(): Promise<void> {
+      await ready();
+      await invoke('start_model_download');
+    },
+
+    async cancelModelDownload(): Promise<void> {
+      await ready();
+      await invoke('cancel_model_download');
+    },
+
+    async removeModel(): Promise<void> {
+      await ready();
+      await invoke('remove_model');
+    },
+
+    async ensureManagedRuntime(): Promise<ManagedRuntimeEndpoint> {
+      await ready();
+      return invoke<ManagedRuntimeEndpoint>('ensure_managed_runtime');
+    },
+
+    async stopManagedRuntime(): Promise<void> {
+      await invoke('stop_managed_runtime').catch(() => undefined);
+    },
+
+    getProviderKey,
+
+    async setProviderKey(key: string, fingerprint?: string): Promise<void> {
+      await ready();
+      await invoke('set_provider_key', { key, fingerprint: fingerprint || '' });
+      analysis?.refreshProvider();
+    },
+
+    async deleteProviderKey(fingerprint?: string): Promise<void> {
+      await ready();
+      await invoke('delete_provider_key', { fingerprint: fingerprint || '' });
+      analysis?.refreshProvider();
+    },
+
+    isDestinationApproved,
+
+    async approveDestination(fingerprint: string): Promise<void> {
+      await ready();
+      await invoke('approve_destination', { fingerprint });
+    },
+
+    testInferenceProvider,
+
     async openExternal(url: string): Promise<boolean> {
       await ready();
       if (!isHttpUrl(url)) return false;
@@ -213,7 +504,9 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
     exportConfig,
 
     async quit(): Promise<boolean> {
+      analysis?.shutdown();
       manager?.destroy();
+      await invoke('stop_managed_runtime').catch(() => undefined);
       await invoke('quit_app');
       return true;
     },

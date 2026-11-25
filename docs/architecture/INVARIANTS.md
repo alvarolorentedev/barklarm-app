@@ -27,7 +27,8 @@ explicit approval.
 - **Operational status** (`Status` + `State`): what the user sees now.
 - **Diagnostic evidence** (`src/types/Diagnostics.ts`): bounded, sanitized source context for a specific failure. It is
   opt-in, in-memory and never enters `State` or the issue webhook.
-- **AI analysis** (proposed, Phase 2+): a separate, evaluation-tested output with citations and uncertainty.
+- **AI analysis** (`src/types/Intelligence.ts`): a separate, validated, evaluation-tested interpretation with citations
+  and uncertainty. It is memory-only and never enters `State` or the webhook.
 
 Do not merge these into one mutable object. Do not build incident management.
 
@@ -36,5 +37,7 @@ Do not merge these into one mutable object. Do not build incident management.
 - Configuration is user data and may contain credentials. Do not log, export implicitly, or transmit it.
 - Integration responses are untrusted input.
 - Issue endpoints are user-configured and receive only allowlisted fields.
-- Diagnostic evidence is untrusted, sanitized, bounded and memory-only. It is never persisted, exported or transmitted.
+- Diagnostic evidence is untrusted, sanitized, bounded and memory-only. It is sent only to the selected inference
+  provider after opt-in; never persisted, exported, sent to telemetry or added to the webhook.
+- Model output is untrusted. Render as text, never HTML or executable content; never follow generated commands or URLs.
 - Mock data is synthetic and must never read or write real configuration paths.

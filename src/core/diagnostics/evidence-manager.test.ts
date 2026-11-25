@@ -85,6 +85,25 @@ describe('EvidenceManager', () => {
     expect(provider.collectEvidence).toHaveBeenCalledTimes(1);
   });
 
+  it('emits available, cleared and reset events for intelligence consumers', async () => {
+    const events: any[] = [];
+    const provider = providerFor(async () => draft('eventful'));
+    const manager = new EvidenceManager({ enabled: true, limits, onEvent: (event) => events.push(event) });
+    manager.setObservers([source('a', provider)]);
+
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+    expect(events.some((event) => event.type === 'available' && event.evidence.summary === 'eventful')).toBe(true);
+    expect(manager.getAvailableEvidence().map((item) => item.observerId)).toEqual(['a']);
+
+    manager.observe([success('a')]);
+    expect(events.some((event) => event.type === 'cleared' && event.observerId === 'a')).toBe(true);
+
+    manager.setEnabled(false);
+    expect(events.some((event) => event.type === 'reset')).toBe(true);
+    manager.shutdown();
+  });
+
   it('does not collect twice for repeated polling or concurrent observers', async () => {
     const provider = providerFor(async () => draft());
     const manager = new EvidenceManager({ enabled: true, limits });

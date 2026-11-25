@@ -1,7 +1,7 @@
 # AI evaluation strategy
 
-Status: Phase 1 fixtures and deterministic evidence checks are implemented. No model, prompt pipeline or inference is
-implemented, and no model evaluation is run in standard CI.
+Status: Phase 2 implements the prompt pipeline, deterministic evaluations and explicit real-model evaluation. Standard CI
+runs deterministic evaluations only; no model is downloaded in CI.
 
 Barklarm will eventually explain failures with local language models. That capability needs a different testing
 discipline from deterministic software.
@@ -70,18 +70,34 @@ Cover at least these categories:
 
 ## Harness conventions
 
-When an evaluation harness is approved:
+Current harness:
 
-- version the model, prompt, retrieval configuration and fixture set;
+- `bun run test:evals:mock` runs the real evidence pipeline plus a deterministic stub provider in standard CI.
+- `bun run test:evals:local` runs the same pipeline against an OpenAI-compatible endpoint, writes review artifacts under
+  `evals/results/`, and never runs in standard CI.
+- The harness records model, runtime, prompt, fixture and inference settings with each run;
 - report per-category scores, not one aggregate number;
 - fail an evaluation run on secret leakage or prompt-injection success, regardless of quality score;
 - keep raw model outputs as review artifacts, never as committed snapshots of truth;
 - require human review for score regressions and for changes to scoring rubrics;
 - keep standard CI deterministic; expose an explicit opt-in command for evaluations.
 
-## Current work
+## Current dataset
 
-Phase 1 adds seven synthetic GitHub Actions cases:
+The Phase 2 dataset has 13 public cases and three held-out cases:
+
+```text
+fixtures/ai-eval/github-actions/
+  ambiguous-timeout/          encoded-injection/        long-log-budget/
+  misleading-success-log/     missing-logs-partial/     multiple-causes/
+  failed-tests/               missing-environment-variable/
+  dependency-failure/         compilation-error/        insufficient-evidence/
+  secret-exposure/            prompt-injection/
+fixtures/ai-eval/held-out/
+  config-syntax-error/        flaky-retry-timeout/      permission-denied/
+```
+
+Phase 1's original seven cases remain:
 
 ```text
 fixtures/ai-eval/github-actions/
@@ -97,7 +113,15 @@ fixtures/ai-eval/github-actions/
 `src/extensions/github/diagnostics/fixtures.test.ts` runs the real provider and normalizer against these inputs. It
 asserts completeness, required evidence IDs and categories, limitation codes, required content and forbidden strings.
 The prompt-injection case preserves adversarial text as data and asserts it is present in the envelope; Phase 1 does not
-claim model-level resistance. The `futureRubric` block is clearly separate from the observable evidence and is not used
-by standard CI.
+claim model-level resistance. The `futureRubric` block stays separate from observable evidence and drives the human
+review of real-model runs; deterministic CI checks only the objective evidence and policy assertions.
 
-This work does not add a model dependency, a prompt, an inference path or a claimed evaluation result.
+## Phase 2 result
+
+The selected default is Qwen3-1.7B-Instruct Q4_K_M (Apache-2.0). Three repeated local runs passed all 16 automatic checks.
+Human review accepted 15/16 cases for correctness and actionability (93.75%). Qwen2.5-1.5B followed a prompt injection
+and was rejected; Phi-3.5-mini failed one automatic output check and was materially slower. Full details:
+[0001-model-selection.md](../evaluations/0001-model-selection.md).
+
+Acceptance thresholds are not lowered. The evaluation is synthetic, small and single-platform; it is not a general
+model-safety claim.

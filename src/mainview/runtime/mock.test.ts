@@ -46,6 +46,19 @@ const requiredScenarios = [
   'diagnostics-disabled',
   'diagnostics-collecting',
   'diagnostics-secrets',
+  'intelligence-disabled',
+  'intelligence-model-missing',
+  'intelligence-downloading',
+  'intelligence-download-failed',
+  'intelligence-ready',
+  'intelligence-runtime-starting',
+  'intelligence-analyzing',
+  'intelligence-complete',
+  'intelligence-insufficient',
+  'intelligence-invalid-response',
+  'intelligence-provider-unavailable',
+  'intelligence-remote-consent',
+  'intelligence-unsupported-hardware',
 ];
 
 describe('mock runtime', () => {
@@ -194,6 +207,134 @@ describe('mock runtime', () => {
     expect(JSON.stringify(snapshot)).not.toContain('ghp_');
     expect(snapshot.evidence?.limitations).toContain('content_redacted');
     expect(snapshot.evidence?.items.some((item) => item.content.includes('[REDACTED]'))).toBe(true);
+  });
+
+  it('serves a validated diagnosis with citations', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-complete',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const analysis = await client.getAnalysis('mock-ai-complete');
+    expect(analysis.status).toBe('available');
+    expect(analysis.analysis?.findings[0].evidenceIds).toContain('error:2001:0');
+    expect(analysis.analysis?.recommendations.length).toBeGreaterThan(0);
+  });
+
+  it('keeps intelligence disabled without inference fixtures', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-disabled',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect((await client.getAnalysis('mock-ai-disabled')).status).toBe('disabled');
+  });
+
+  it('simulates queued analysis and reanalysis', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-analyzing',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('queued');
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('analyzing');
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('queued');
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('analyzing');
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('available');
+    await client.reanalyze('mock-ai-analyzing');
+    expect((await client.getAnalysis('mock-ai-analyzing')).status).toBe('queued');
+  });
+
+  it('simulates model download progress and removal', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-downloading',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const first = await client.getIntelligenceStatus();
+    expect(first.download.status).toBe('downloading');
+    expect(first.download.receivedBytes).toBeGreaterThan(0);
+    await client.getIntelligenceStatus();
+    await client.getIntelligenceStatus();
+    await client.getIntelligenceStatus();
+    expect((await client.getIntelligenceStatus()).download.status).toBe('installed');
+    await client.removeModel();
+    expect((await client.getIntelligenceStatus()).download.status).toBe('idle');
+  });
+
+  it('requires consent for a remote destination', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-remote-consent',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const status = await client.getIntelligenceStatus();
+    expect(status.destination).toBe('https://inference.example.test/v1');
+    expect(status.consentRequired).toBe(true);
+    expect(status.destinationApproved).toBe(false);
+    expect((await client.getAnalysis('mock-ai-consent')).reason).toBe('consent_required');
+    const destination = status.destination;
+    expect(destination).toBeTruthy();
+    if (!destination) throw new Error('missing destination');
+    expect(await client.testInferenceProvider({ endpoint: destination, model: 'mock-remote-model' })).toEqual({
+      ok: false,
+      error: 'consent_required',
+    });
+    await client.approveDestination('fingerprint');
+    expect((await client.getIntelligenceStatus()).destinationApproved).toBe(true);
+  });
+
+  it('represents insufficient evidence, invalid output and unsupported hardware', async () => {
+    const insufficient = createMockClient({
+      scenarioName: 'intelligence-insufficient',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect((await insufficient.getAnalysis('mock-ai-insufficient')).status).toBe('insufficient_evidence');
+
+    const invalid = createMockClient({
+      scenarioName: 'intelligence-invalid-response',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect(await invalid.getAnalysis('mock-ai-invalid')).toEqual({
+      status: 'failed',
+      reason: 'invalid_response',
+    });
+
+    const hardware = createMockClient({
+      scenarioName: 'intelligence-unsupported-hardware',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect((await hardware.getIntelligenceStatus()).hardware.managedRuntimeSupported).toBe(false);
+    expect((await hardware.getAnalysis('mock-ai-hardware')).reason).toBe('unsupported_hardware');
+  });
+
+  it('represents download failure, ready runtime and custom provider status', async () => {
+    const failed = createMockClient({
+      scenarioName: 'intelligence-download-failed',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const failedStatus = await failed.getIntelligenceStatus();
+    expect(failedStatus.download.status).toBe('failed');
+    expect(failedStatus.model.status).toBe('error');
+
+    const ready = createMockClient({ scenarioName: 'intelligence-ready', storage: new MemoryStorage(), reset: true });
+    const readyStatus = await ready.getIntelligenceStatus();
+    expect(readyStatus.model.installed).toBe(true);
+    expect(readyStatus.runtime.state).toBe('ready');
+
+    const provider = createMockClient({
+      scenarioName: 'intelligence-provider-unavailable',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const providerStatus = await provider.getIntelligenceStatus();
+    expect(providerStatus.mode).toBe('custom');
+    expect(providerStatus.providerConfigured).toBe(true);
+    expect(providerStatus.destination).toBe('https://inference.example.test/v1');
   });
 
   it('only opens HTTP(S) links', async () => {

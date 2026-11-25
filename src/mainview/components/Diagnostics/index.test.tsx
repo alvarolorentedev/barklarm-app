@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiagnosticEvidence } from '../../../types/Diagnostics';
@@ -13,6 +13,8 @@ vi.mock('../../rpc-client', () => ({
   client: {
     getDiagnosticEvidence: vi.fn(),
     recollectDiagnosticEvidence: vi.fn(),
+    getAnalysis: vi.fn().mockResolvedValue({ status: 'disabled' }),
+    reanalyze: vi.fn(),
     openExternal: vi.fn().mockResolvedValue(true),
   },
 }));
@@ -56,6 +58,7 @@ const evidence: DiagnosticEvidence = {
 describe('DiagnosticPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockClient.getAnalysis.mockResolvedValue({ status: 'disabled' });
   });
 
   it('renders evidence, limitations and safe source actions', async () => {
@@ -130,7 +133,9 @@ describe('DiagnosticPanel', () => {
     render(<DiagnosticPanel observerId="observer-1" />);
 
     expect(await screen.findByText('Diagnostic evidence could not be loaded.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    fireEvent.click(
+      within(screen.getByRole('region', { name: 'Diagnostic evidence' })).getByRole('button', { name: 'Retry' })
+    );
     expect(await screen.findByText('Diagnostics are disabled. Enable them in General settings.')).toBeInTheDocument();
   });
 });

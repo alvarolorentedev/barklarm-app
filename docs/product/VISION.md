@@ -5,10 +5,11 @@ what to do next — without sending your operational data to someone else's clou
 
 ## Today
 
-Barklarm 3.x is a native Tauri app. Observers poll CI and observability sources, reduce each source to a status, and
+Barklarm 4.0 is a native Tauri app. Observers poll CI and observability sources, reduce each source to a status, and
 keep the tray icon, menu and notifications in sync. Configuration and credentials stay on the machine. Ten integrations
 ship today: GitHub Actions, Azure DevOps, Bitbucket, CCTray, Datadog, Sentry, New Relic, Opsgenie, Grafana and Graylog.
-Phase 1 adds opt-in, bounded diagnostic evidence for GitHub Actions failures, still local and without inference.
+Phase 1 adds opt-in, bounded diagnostic evidence for GitHub Actions failures. Phase 2 adds optional local intelligence:
+a managed llama.cpp runtime or a user-configured OpenAI-compatible provider, with cited and validated explanations.
 
 ## Direction
 
@@ -20,8 +21,8 @@ The radiator becomes a diagnostician:
 4. **Trust by default.** Never leak secrets, never execute instructions found in logs, and show uncertainty instead of
    guessing.
 
-This direction is a product hypothesis, not a commitment to a model vendor, cloud service or agent framework. No
-inference, model download or cloud backend is implemented in Phase 1.
+This direction is a product hypothesis, not a commitment to a cloud service or agent framework. Phase 2 implements
+opt-in local inference and a custom-provider path; there is still no backend, account or mandatory cloud dependency.
 
 ## Phase 0 scope
 
@@ -34,9 +35,15 @@ and agent-ready documentation.
 Collect and present bounded, sanitized evidence for supported failures, with deterministic fixtures for future
 evaluation. Evidence is opt-in and memory-only. No inference or model runtime is added.
 
+## Phase 2 scope
+
+Optional, local-first diagnosis: deterministic evidence context, a versioned prompt, strict validation, a managed
+llama.cpp runtime, verified on-demand GGUF downloads, a custom OpenAI-compatible provider, explicit remote consent and a
+separate analysis panel. Intelligence is disabled by default and never changes operational status.
+
 ## Non-goals
 
-- No AI features, model runtime, embeddings or prompt pipeline in this phase.
-- No backend, account system, telemetry or mandatory cloud infrastructure.
+- No autonomous remediation, tool calling, shell execution, incident management or persistent analysis history.
+- No backend, account system, telemetry, model marketplace or mandatory cloud infrastructure.
 - No incident-management platform, on-call scheduling or team workflows.
 - No rewrite of the Tauri/React architecture or integration surface.

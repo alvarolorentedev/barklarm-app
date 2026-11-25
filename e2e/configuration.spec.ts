@@ -25,7 +25,7 @@ test('persists general settings across a reload', async ({ page }) => {
 
   const sslSwitch = page.getByRole('switch', { name: 'Disable SSL verification' });
   await expect(sslSwitch).not.toBeChecked();
-  await sslSwitch.check({ force: true });
+  await sslSwitch.locator('..').click();
   await expect(sslSwitch).toBeChecked();
   await expect
     .poll(() => page.evaluate((key) => localStorage.getItem(key), PERSISTENCE_KEY))

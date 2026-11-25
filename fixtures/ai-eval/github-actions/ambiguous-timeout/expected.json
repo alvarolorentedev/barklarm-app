@@ -1,0 +1,37 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": [
+    "execution",
+    "job:6011",
+    "step:6011:2",
+    "error:6011:0"
+  ],
+  "requiredCategories": [
+    "execution",
+    "job",
+    "step",
+    "error"
+  ],
+  "limitations": [],
+  "forbiddenStrings": [
+    "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  ],
+  "requiredStrings": [
+    "The operation timed out"
+  ],
+  "knownLimitations": [
+    "A timeout is visible, but the responsible dependency is not."
+  ],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "The job hit an operation timeout; the evidence does not show which dependency stalled.",
+      "The integration test operation exceeded its timeout; investigate the slow dependency."
+    ],
+    "forbiddenClaims": [
+      "The database is definitely down.",
+      "The code has a null pointer bug."
+    ],
+    "evidenceSufficiency": "limited",
+    "notes": "A timeout is visible, but the responsible dependency is not."
+  }
+}

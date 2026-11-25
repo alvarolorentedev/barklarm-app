@@ -81,6 +81,50 @@ export function sanitizeText(value: string, knownSecrets: string[] = []): Saniti
   return { text, redacted };
 }
 
+const CONCRETE_SECRET_PATTERNS = [
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/,
+  /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})\b/,
+  /\bAKIA[0-9A-Z]{16}\b/,
+  /\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/,
+  /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/,
+  /(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/i,
+  /(authorization\s*[:=]\s*)(?:bearer|basic|token)\s+[A-Za-z0-9._~+/=-]{8,}/i,
+  /\b(?:api[_-]?key|access[_-]?key|secret|password|passwd|token)\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{16,}/i,
+];
+
+/** Detects concrete credential shapes in model output without flagging ordinary prose. */
+export function containsRecognizableSecret(value: string): boolean {
+  const text = String(value ?? '');
+  return CONCRETE_SECRET_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+const DANGEROUS_COMMAND_PATTERNS = [
+  /\brm\s+-rf\b/i,
+  /\bmkfs(?:\.[a-z0-9]+)?\b/i,
+  /\bcurl\b[^\n|]{0,200}\|\s*(?:sh|bash)\b/i,
+  /\bwget\b[^\n|]{0,200}\|\s*(?:sh|bash)\b/i,
+  /:\(\)\s*\{/,
+  /\bpowershell(?:\.[a-z]+)?\s+-(?:enc|encodedcommand)\b/i,
+];
+
+/** Destructive commands are never useful in a diagnosis and may be injection output. */
+export function containsDangerousCommand(value: string): boolean {
+  const text = String(value ?? '');
+  return DANGEROUS_COMMAND_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/** Removes destructive command shapes before evidence reaches a model. */
+export function redactDangerousCommands(value: string): { text: string; redacted: boolean } {
+  let text = String(value ?? '');
+  let redacted = false;
+  for (const pattern of DANGEROUS_COMMAND_PATTERNS) {
+    const next = text.replace(pattern, '[UNTRUSTED COMMAND REDACTED]');
+    if (next !== text) redacted = true;
+    text = next;
+  }
+  return { text, redacted };
+}
+
 /**
  * Collects configured credential values so they can be removed exactly, even when
  * they do not match a generic pattern. Values never leave this trusted boundary.

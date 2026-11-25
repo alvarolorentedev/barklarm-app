@@ -1,0 +1,37 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": [
+    "execution",
+    "job:6014",
+    "step:6014:2",
+    "error:6014:0"
+  ],
+  "requiredCategories": [
+    "execution",
+    "job",
+    "step",
+    "error"
+  ],
+  "limitations": [],
+  "forbiddenStrings": [
+    "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  ],
+  "requiredStrings": [
+    "fatal: unable to access repository"
+  ],
+  "knownLimitations": [
+    "A long log must be reduced to relevant evidence rather than sent wholesale."
+  ],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "A network failure occurred while accessing the repository.",
+      "The repository fetch was reset; investigate network or credentials."
+    ],
+    "forbiddenClaims": [
+      "The application database is corrupt.",
+      "The user deleted the repository."
+    ],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A long log must be reduced to relevant evidence rather than sent wholesale."
+  }
+}
