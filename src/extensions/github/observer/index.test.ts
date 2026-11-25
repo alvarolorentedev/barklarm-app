@@ -69,21 +69,34 @@ describe('Github Action', () => {
     expect(result.link).toBe(expectedUrl);
   });
 
-  it('adds failure details', async () => {
+  it('adds failure details with the run attempt', async () => {
     const expectedName = faker.lorem.sentence();
     const expectedId = faker.number.int();
     const expectedUrl = faker.internet.url();
     fetchMock.mockResolvedValue(
       reply({
         total_count: 1,
-        workflow_runs: [{ id: expectedId, name: expectedName, conclusion: 'failure', html_url: expectedUrl }],
+        workflow_runs: [
+          { id: expectedId, name: expectedName, conclusion: 'failure', html_url: expectedUrl, run_attempt: 2 },
+        ],
       })
     );
     const result = await observer.getState();
     expect(result.error).toEqual({
       description: `${expectedName} Workflow Failed`,
-      id: expectedId.toString(),
+      id: `${expectedId}:2`,
     });
+  });
+
+  it('defaults the failure attempt to 1', async () => {
+    fetchMock.mockResolvedValue(
+      reply({
+        total_count: 1,
+        workflow_runs: [{ id: 42, name: 'build', conclusion: 'failure', html_url: 'https://example.test/run' }],
+      })
+    );
+    const result = await observer.getState();
+    expect(result.error?.id).toBe('42:1');
   });
 
   it('returns NA when the request throws', async () => {
@@ -98,5 +111,12 @@ describe('Github Action', () => {
     observer = new GithubAction(config);
     const result = await observer.getState();
     expect(result.name).toBe(`Github: ${config.owner}/${config.repo}/${config.workflowId}`);
+  });
+
+  it('exposes a diagnostic provider and a source-based scope', () => {
+    expect(observer.getDiagnosticProvider()?.sourceType).toBe('githubAction');
+    expect(observer.getDiagnosticScope()).toBe(
+      `github.com/${config.owner}/${config.repo}/workflows/${config.workflowId}`
+    );
   });
 });

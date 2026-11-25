@@ -1,8 +1,10 @@
+import { DiagnosticProvider } from '../../../types/Diagnostics';
 import { Observer } from '../../../types/Observer';
 import { State } from '../../../types/State';
 import { GithubActionConfiguration } from '../type';
 import { Status } from '../../../types/Status';
 import { fetchWrapper } from '../../fetch-adapter';
+import { GithubDiagnosticProvider } from '../diagnostics/provider';
 
 export class GithubAction extends Observer {
   private owner: string;
@@ -10,6 +12,7 @@ export class GithubAction extends Observer {
   private workflowId: string;
   private authToken: string;
   private baseLink: string;
+  private diagnosticProvider?: DiagnosticProvider;
 
   constructor({ authToken, owner, repo, workflowId, alias, issueEndpoint, muted }: GithubActionConfiguration) {
     super(alias || `Github: ${owner}/${repo}/${workflowId}`, issueEndpoint, muted);
@@ -38,6 +41,7 @@ export class GithubAction extends Observer {
       const run = data.workflow_runs[0];
       const status = this.getStatus(run.conclusion);
 
+      const attempt = Number(run.run_attempt) > 0 ? Number(run.run_attempt) : 1;
       return {
         name: this.alias,
         status,
@@ -47,7 +51,8 @@ export class GithubAction extends Observer {
         error:
           status === Status.FAILURE
             ? {
-                id: run.id.toString(),
+                // A rerun is a new failure event even though GitHub keeps the run ID.
+                id: `${run.id}:${attempt}`,
                 description: `${run.name} Workflow Failed`,
               }
             : undefined,
@@ -62,6 +67,21 @@ export class GithubAction extends Observer {
         issueEndpoint: this.issueEndpoint,
       };
     }
+  }
+
+  getDiagnosticProvider(): DiagnosticProvider {
+    if (!this.diagnosticProvider) {
+      this.diagnosticProvider = new GithubDiagnosticProvider({
+        owner: this.owner,
+        repo: this.repo,
+        authToken: this.authToken,
+      });
+    }
+    return this.diagnosticProvider;
+  }
+
+  getDiagnosticScope(): string {
+    return `github.com/${this.owner}/${this.repo}/workflows/${this.workflowId}`;
   }
 
   private getStatus(conclusion: string | null): Status {
