@@ -102,3 +102,6 @@ typings/
 
 # Intellij IDEA
 .idea/
+# Playwright
+playwright-report/
+test-results/

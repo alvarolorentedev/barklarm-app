@@ -1,8 +1,9 @@
+import { createObserverId } from '../../../../core/config';
 import { observersfromLinkParser } from '../../../../extensions/observersfromLinkParser';
 
 export const mutations = (observables: any[], setObservables: any) => ({
   addObserver: (observer: any): void => {
-    setObservables([...observables, observer]);
+    setObservables([...observables, { ...observer, id: observer.id || createObserverId() }]);
   },
   removeObserver: (index: number): void => {
     setObservables(observables.filter((_: any, currentIndex: number) => currentIndex != index));
@@ -19,7 +20,7 @@ export const mutations = (observables: any[], setObservables: any) => ({
     const text = dataTrasfer.getData('Text');
     observersfromLinkParser.forEach((parser) => {
       if (!parser.canApply(text)) return;
-      setObservables([...observables, parser.apply(text)]);
+      setObservables([...observables, { ...parser.apply(text), id: createObserverId() }]);
     });
   },
 });

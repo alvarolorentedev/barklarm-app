@@ -16,10 +16,13 @@ describe('mutations', () => {
     mutationFunctions = mutations(initialObservables, setObservablesMock);
   });
   describe('addObserver', () => {
-    it('should add the new value to the existing collection', () => {
+    it('should add the new value to the existing collection with a stable ID', () => {
       const newObservable = { some: faker.string.uuid() };
       mutationFunctions.addObserver(newObservable);
-      expect(setObservablesMock).toBeCalledWith([...initialObservables, newObservable]);
+      expect(setObservablesMock).toBeCalledWith([
+        ...initialObservables,
+        expect.objectContaining({ ...newObservable, id: expect.any(String) }),
+      ]);
     });
   });
   describe('removeObserver', () => {
@@ -63,7 +66,12 @@ describe('mutations', () => {
       mutationFunctions.parseDataransfer(dataTransfer);
       expect(setObservablesMock).toBeCalledWith([
         ...initialObservables,
-        { monitorId: '4005341', site: 'datadoghq.eu', type: 'datadogMonitor' },
+        expect.objectContaining({
+          monitorId: '4005341',
+          site: 'datadoghq.eu',
+          type: 'datadogMonitor',
+          id: expect.any(String),
+        }),
       ]);
     });
   });

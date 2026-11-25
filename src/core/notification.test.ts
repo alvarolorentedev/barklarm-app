@@ -29,4 +29,44 @@ describe('NotificationManager', () => {
 
     expect(show).not.toHaveBeenCalled();
   });
+
+  it('notifies when a new failure replaces an existing failure', () => {
+    const show = vi.fn();
+    const notifications = new NotificationManager(show);
+
+    notifications.updateNotifications(
+      [{ id: 'build', name: 'build', status: Status.FAILURE, link: '', error: { id: 'run-1', description: '' } }],
+      [{ id: 'build', name: 'build', status: Status.FAILURE, link: '', error: { id: 'run-2', description: '' } }]
+    );
+
+    expect(show).toHaveBeenCalledWith('Failed', 'build Failed');
+  });
+
+  it('does not repeat a notification for the same failure event', () => {
+    const show = vi.fn();
+    const notifications = new NotificationManager(show);
+    const state = {
+      id: 'build',
+      name: 'build',
+      status: Status.FAILURE,
+      link: '',
+      error: { id: 'run-1', description: '' },
+    };
+
+    notifications.updateNotifications([state], [{ ...state }]);
+
+    expect(show).not.toHaveBeenCalled();
+  });
+
+  it('matches observers by ID rather than a duplicate alias', () => {
+    const show = vi.fn();
+    const notifications = new NotificationManager(show);
+
+    notifications.updateNotifications(
+      [{ id: 'a', name: 'API build', status: Status.SUCCESS, link: '' }],
+      [{ id: 'b', name: 'API build', status: Status.FAILURE, link: '' }]
+    );
+
+    expect(show).toHaveBeenCalledWith('Failed', 'API build Failed');
+  });
 });

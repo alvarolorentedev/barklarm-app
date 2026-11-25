@@ -10,8 +10,20 @@ export class NotificationManager {
   updateNotifications(oldStates: State[], actualStates: State[]): void {
     actualStates.forEach((current) => {
       if (current.muted) return;
-      const previous = oldStates.find(({ name }) => name === current.name) || ({ status: Status.NA } as State);
-      if (current.status === previous.status) return;
+      const previous =
+        oldStates.find((state) => (current.id && state.id ? state.id === current.id : state.name === current.name)) ||
+        ({ status: Status.NA } as State);
+
+      const statusChanged = current.status !== previous.status;
+      // A source-specific failure ID means the observer stayed red for a new
+      // event (for example another failed workflow run).
+      const newFailureEvent =
+        current.status === Status.FAILURE &&
+        previous.status === Status.FAILURE &&
+        !!current.error?.id &&
+        current.error.id !== previous.error?.id;
+
+      if (!statusChanged && !newFailureEvent) return;
 
       const titleMap: Record<Status, string> = {
         [Status.FAILURE]: translate('Failed'),

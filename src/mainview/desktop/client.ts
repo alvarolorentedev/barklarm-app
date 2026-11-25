@@ -8,23 +8,20 @@ import {
 } from '@tauri-apps/plugin-autostart';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
-import { BarklarmConfig, DEFAULT_CONFIG, normalizeRefreshInterval } from '../../core/config';
+import {
+  BarklarmConfig,
+  DEFAULT_CONFIG,
+  normalizeConfig,
+  normalizeObservables,
+  normalizeRefreshInterval,
+} from '../../core/config';
 import { initialize as initializeI18n } from '../../core/i18n';
 import { NotificationManager } from '../../core/notification';
 import { ObserverManager, ObserverPresenter } from '../../core/observer-manager';
 import { setFetchImplementation } from '../../extensions/fetch-adapter';
 import { State } from '../../types/State';
+import type { AppRPCClient } from '../runtime/types';
 import { setupAppMenu, TrayPresenter } from './tray';
-
-export type AppRPCClient = {
-  getStore(key: string): Promise<any>;
-  setStore(key: string, value: any): Promise<void>;
-  refreshObservers(): Promise<void>;
-  getObserverStates(): Promise<State[]>;
-  importConfig(): Promise<boolean>;
-  exportConfig(): Promise<boolean>;
-  quit(): Promise<boolean>;
-};
 
 const noopPresenter: ObserverPresenter = {
   updateImage: () => undefined,
@@ -37,8 +34,13 @@ let tray: TrayPresenter | null = null;
 let readyPromise: Promise<void> | null = null;
 
 async function loadConfig(): Promise<BarklarmConfig> {
-  const stored = await invoke<BarklarmConfig>('load_config');
-  config = { ...DEFAULT_CONFIG, ...(stored || {}) };
+  const stored = await invoke<unknown>('load_config');
+  config = normalizeConfig(stored);
+  const storedObservables = (stored as BarklarmConfig | null)?.observables;
+  if (storedObservables !== undefined && JSON.stringify(storedObservables) !== JSON.stringify(config.observables)) {
+    // Persist legacy IDs so imports and exports keep stable observer identity.
+    await saveConfig();
+  }
   return config;
 }
 
@@ -151,40 +153,49 @@ async function exportConfig(): Promise<boolean> {
   return exported;
 }
 
-export const client: AppRPCClient = {
-  async getStore(key: string): Promise<any> {
-    await ready();
-    return (config as any)[key];
-  },
+export async function createDesktopClient(): Promise<AppRPCClient> {
+  await initialize();
 
-  async setStore(key: string, value: any): Promise<void> {
-    await ready();
-    (config as any)[key] = value;
-    await saveConfig();
+  return {
+    async getStore(key: string): Promise<any> {
+      await ready();
+      return (config as any)[key];
+    },
 
-    if (key === 'observables') await manager?.refreshObservers(value || []);
-    if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
-    if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
-    if (key === 'autostart') await applyAutostart();
-  },
+    async setStore(key: string, value: any): Promise<void> {
+      await ready();
+      config =
+        key === 'observables'
+          ? { ...config, observables: normalizeObservables(value) }
+          : ({ ...config, [key]: value } as BarklarmConfig);
+      await saveConfig();
 
-  async refreshObservers(): Promise<void> {
-    await ready();
-    await manager?.refreshObservers(config.observables || []);
-  },
+      if (key === 'observables') await manager?.refreshObservers(config.observables || []);
+      if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
+      if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
+      if (key === 'autostart') await applyAutostart();
+    },
 
-  async getObserverStates(): Promise<State[]> {
-    await ready();
-    return manager?.getStates() || [];
-  },
+    async refreshObservers(): Promise<void> {
+      await ready();
+      await manager?.refreshObservers(config.observables || []);
+    },
 
-  importConfig,
-  exportConfig,
+    async getObserverStates(): Promise<State[]> {
+      await ready();
+      return manager?.getStates() || [];
+    },
 
-  async quit(): Promise<boolean> {
-    await invoke('quit_app');
-    return true;
-  },
-};
+    importConfig,
+    exportConfig,
 
-export { initialize };
+    async quit(): Promise<boolean> {
+      await invoke('quit_app');
+      return true;
+    },
+
+    logError(message: string): void {
+      void invoke('log_frontend', { message }).catch(() => undefined);
+    },
+  };
+}

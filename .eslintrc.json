@@ -22,5 +22,40 @@
     "@typescript-eslint/no-explicit-any": "off",
     "import/no-unresolved": ["error", { "ignore": ["^electrobun$", "^electrobun/"] }],
     "import/no-duplicates": "off"
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/core/**/*.ts", "src/extensions/*/observer/**/*.ts", "src/extensions/*/type/**/*.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@tauri-apps/**", "**/mainview/**"],
+                "message": "Core and observer code must not depend on Tauri or React presentation."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["src/mainview/**/*.{ts,tsx}"],
+      "excludedFiles": ["src/mainview/desktop/**", "src/mainview/rpc-client.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@tauri-apps/**"],
+                "message": "Native imports belong in src/mainview/desktop or the runtime facade."
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
 }

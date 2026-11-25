@@ -7,6 +7,7 @@ import { State } from '../../types/State';
 import { translate } from '../../core/i18n';
 import { fetchWrapper } from '../../extensions/fetch-adapter';
 import { ObserverPresenter } from '../../core/observer-manager';
+import { buildIssuePayload, isHttpUrl } from '../../core/issue';
 
 import okIconUrl from '../../assets/ok_icon_big.png';
 import failIconUrl from '../../assets/fail_icon_big.png';
@@ -43,9 +44,10 @@ function openExternal(url: string): void {
 }
 
 function openIssue(state: State, endpoint: string): void {
+  if (!isHttpUrl(endpoint)) return;
   void fetchWrapper(endpoint, {
     method: 'POST',
-    body: JSON.stringify(state),
+    body: JSON.stringify(buildIssuePayload(state)),
     headers: { 'Content-Type': 'application/json' },
   }).catch((error) => console.error('Failed to open issue:', error));
 }

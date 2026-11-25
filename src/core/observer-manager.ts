@@ -3,6 +3,7 @@ import { ObserverConfiguration } from '../types/ObserverConfiguration';
 import { State } from '../types/State';
 import { Status } from '../types/Status';
 import { ObserversBuildersMap } from '../extensions/observerBuiderMap';
+import { normalizeObservables } from './config';
 import { NotificationManager } from './notification';
 
 export interface ObserverPresenter {
@@ -12,15 +13,22 @@ export interface ObserverPresenter {
 
 export type ObserverFactory = (config: ObserverConfiguration) => Promise<Observer | undefined>;
 
+type ObserverEntry = {
+  config: ObserverConfiguration;
+  observer: Observer;
+};
+
 async function defaultFactory(config: ObserverConfiguration): Promise<Observer | undefined> {
   const build = ObserversBuildersMap[config.type];
   return build ? build(config) : undefined;
 }
 
 export class ObserverManager {
-  private observers: Observer[] = [];
+  private entries: ObserverEntry[] = [];
   private observersState: State[] = [];
   private intervalId: ReturnType<typeof setInterval> | null = null;
+  private inFlight: Promise<void> | null = null;
+  private generation = 0;
 
   constructor(
     private readonly presenter: ObserverPresenter,
@@ -36,45 +44,77 @@ export class ObserverManager {
   }
 
   async setConfigs(configs: ObserverConfiguration[]): Promise<void> {
-    const observers = await Promise.all(
-      configs.map(async (config) => {
+    const generation = ++this.generation;
+    const normalized = normalizeObservables(configs);
+    const entries = await Promise.all(
+      normalized.map(async (config) => {
         try {
-          return await this.factory(config);
+          const observer = await this.factory(config);
+          return observer ? { config, observer } : undefined;
         } catch (error) {
           console.error(error);
           return undefined;
         }
       })
     );
-    this.observers = observers.filter(Boolean) as Observer[];
+    // A newer configuration was applied while observers were being built.
+    if (generation !== this.generation) return;
+    this.entries = entries.filter(Boolean) as ObserverEntry[];
   }
 
   async refreshObservers(configs: ObserverConfiguration[]): Promise<void> {
     await this.setConfigs(configs);
+    if (this.inFlight) await this.inFlight.catch(() => undefined);
     await this.refreshState();
   }
 
-  async refreshState(): Promise<void> {
-    const oldStates = this.observersState.length > 0 ? [...this.observersState] : [];
-    this.observersState = await Promise.all(
-      this.observers.map(async (observer) => {
-        try {
-          return await observer.getState();
-        } catch (error) {
-          console.error(error);
-          return { name: 'Unknown', status: Status.NA, link: '' };
-        }
-      })
-    );
-    const globalState: State = {
-      name: 'Global',
-      status: this.calculateGlobalStatus(this.observersState),
-      link: '',
-    };
+  /**
+   * Coalesces concurrent refreshes. Interval ticks that arrive while a refresh
+   * is running are skipped instead of queued, so a slow source cannot build up
+   * a backlog. Explicit config changes wait for the current run first.
+   */
+  refreshState(): Promise<void> {
+    if (this.inFlight) return this.inFlight;
+    return this.runRefresh();
+  }
 
-    this.notifications.updateNotifications(oldStates, this.observersState);
-    this.presenter.updateImage(globalState);
-    this.presenter.updateMenu(this.observersState);
+  private async runRefresh(): Promise<void> {
+    const generation = this.generation;
+    const entries = [...this.entries];
+    const task = (async () => {
+      const states = await Promise.all(
+        entries.map(async ({ config, observer }) => {
+          try {
+            const state = await observer.getState();
+            return { ...state, id: config.id };
+          } catch (error) {
+            console.error(error);
+            return { id: config.id, name: config.alias || 'Unknown', status: Status.NA, link: '' };
+          }
+        })
+      );
+      // Discard results collected for a configuration that has since changed.
+      if (generation !== this.generation) return;
+
+      const oldStates = [...this.observersState];
+      this.observersState = states;
+      const globalState: State = {
+        name: 'Global',
+        status: this.calculateGlobalStatus(this.observersState),
+        link: '',
+      };
+
+      this.notifications.updateNotifications(oldStates, this.observersState);
+      this.presenter.updateImage(globalState);
+      this.presenter.updateMenu(this.observersState);
+    })();
+
+    this.inFlight = task;
+    try {
+      await task;
+    } finally {
+      if (this.inFlight === task) this.inFlight = null;
+    }
   }
 
   getStates(): State[] {

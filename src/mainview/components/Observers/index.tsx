@@ -49,6 +49,7 @@ export const Observers = ({
   };
 
   const query = search.trim().toLowerCase();
+  const statesById = new Map(states.filter((state) => state.id).map((state) => [state.id as string, state]));
   const visible = observables
     .map((observable, index) => ({ observable, index }))
     .filter(({ observable }) => {
@@ -106,7 +107,7 @@ export const Observers = ({
                     </span>
                     <span className="observer-type">{getTypeLabel(observable.type)}</span>
                     <span className="observer-status">
-                      <StatusPill status={states[index]?.status} />
+                      <StatusPill status={statesById.get(observable.id)?.status ?? states[index]?.status} />
                     </span>
                   </button>
                   <button type="button" className="observer-remove" onClick={() => removeObserver(index)}>

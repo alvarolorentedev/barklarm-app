@@ -3,11 +3,10 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import { App } from './app';
 import './app.css';
-import './rpc-client';
-import { invoke } from '@tauri-apps/api/core';
+import { client } from './rpc-client';
 
 const logFrontend = (message: string) => {
-  void invoke('log_frontend', { message }).catch(() => undefined);
+  client.logError(message);
 };
 
 window.addEventListener('error', (event) => {
