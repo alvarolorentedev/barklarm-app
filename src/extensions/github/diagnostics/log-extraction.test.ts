@@ -16,6 +16,12 @@ describe('extractLogExcerpts', () => {
     expect(result.excerpts[0].lines.join('\n')).toContain('installing');
   });
 
+  it('recognizes a timestamped GitHub annotation', () => {
+    const result = extractLogExcerpts('2026-01-15T10:00:00.1234567Z ##[error]Process completed with exit code 1.');
+
+    expect(result.excerpts[0].signal).toBe('github-annotation');
+  });
+
   it('finds compilation errors', () => {
     const result = extractLogExcerpts("src/app.ts(12,5): error TS2322: Type 'string' is not assignable to 'number'.");
 

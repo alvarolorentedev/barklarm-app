@@ -55,7 +55,7 @@ function cleanLog(text: string): string {
 }
 
 function match(line: string): { score: number; signal: string } | undefined {
-  const trimmed = line.trim();
+  const trimmed = line.trim().replace(/^\d{4}-\d{2}-\d{2}T[0-9:.]+Z\s+/, '');
   if (/^##\[error\]/i.test(trimmed) || /::error\b/.test(trimmed)) return { score: 10, signal: 'github-annotation' };
   if (/\berror TS\d+/.test(trimmed) || /\berror\[E\d+\]/.test(trimmed)) return { score: 8, signal: 'compile-error' };
   if (/^(?:FAILED|FAIL)\b/.test(trimmed) || /^\s*E\s{2,}/.test(line) || /\bAssertionError\b/.test(trimmed)) {
