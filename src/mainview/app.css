@@ -1,4 +1,6 @@
 :root {
+  /* dark OS-drawn parts (native select popup, scrollbars) so they match the hardcoded dark theme */
+  color-scheme: dark;
   --bg-sidebar: #1e1e1f;
   --bg-content: #252527;
   --bg-surface: #2b2b2e;
