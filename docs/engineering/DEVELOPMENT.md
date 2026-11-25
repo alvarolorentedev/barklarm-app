@@ -128,6 +128,21 @@ bun run audit   # production dependencies, high/critical
 CI runs `bun audit --production --audit-level=high`. Dev-only advisories are reviewed but do not block releases; see
 [SECURITY.md](SECURITY.md) for the current accepted set.
 
+## Known debt
+
+These are tracked, not silently ignored:
+
+- TypeScript is pinned to 4.5 with `strict` disabled; raising it needs a dedicated change.
+- The renderer has two i18n helpers (`src/core/i18n.ts` initialized by the desktop runtime and
+  `src/mainview/i18n.ts` reading `navigator.language`). They share the same translation files; unify
+  them in a dedicated task.
+- The Tauri CSP is unset and the HTTP capability allows any HTTP(S) host; both are documented security
+  findings in [SECURITY.md](SECURITY.md).
+- The native build warns that the bundle identifier ends in `.app`; changing it would break update
+  identity and needs a migration decision.
+- `.codeclimate.yml` still references an old renderer path and ESLint 6 and is not used by CI.
+- macOS/Windows release builds are unsigned and not notarized.
+
 ## Troubleshooting
 
 | Symptom                                                      | Cause / action                                    |

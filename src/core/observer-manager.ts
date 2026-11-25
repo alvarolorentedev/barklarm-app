@@ -124,7 +124,7 @@ export class ObserverManager {
   start(refreshInterval: number): void {
     this.stop();
     this.intervalId = setInterval(() => {
-      void this.refreshState();
+      void this.refreshState().catch((error) => console.error('Observer refresh failed:', error));
     }, refreshInterval);
   }
 

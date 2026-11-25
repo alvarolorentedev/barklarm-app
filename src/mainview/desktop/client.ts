@@ -39,7 +39,7 @@ async function loadConfig(): Promise<BarklarmConfig> {
   const storedObservables = (stored as BarklarmConfig | null)?.observables;
   if (Array.isArray(storedObservables) && JSON.stringify(storedObservables) !== JSON.stringify(config.observables)) {
     // Persist legacy IDs so imports and exports keep stable observer identity.
-    await saveConfig();
+    await saveConfig().catch((error) => console.error('Failed to persist migrated observer IDs:', error));
   }
   return config;
 }
