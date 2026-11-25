@@ -54,16 +54,16 @@ personal data in a test, trace or screenshot. CI requires no secrets for validat
 
 ## Unresolved findings and accepted risks
 
-| Finding                                                              | Severity            | Status                                                                                                        |
-| -------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------- |
-| Config and exports store integration tokens in plaintext             | Medium              | Accepted for local-first 3.x; documented. Encrypting at rest is a future decision.                            |
-| Tauri content security policy is `null`                              | Medium              | Unresolved. Tightening it requires native validation; do not change without a spec and smoke test.            |
-| HTTP capability allows any `http(s)` host                            | Medium              | Required for user-configured integrations. Revisit if integrations gain fixed hosts.                          |
-| `react-router` 6.30.6 open-redirect / SSR deserialization advisories | Moderate            | Tracked. App uses `HashRouter` without SSR, reducing exposure; fix requires router major upgrade.             |
-| `fast-xml-parser` 4.5.7 CPU advisory for unterminated stop-node tags | Low                 | Tracked. CCTray input is user-configured; fix requires parser major upgrade.                                  |
-| Dev-only Vite/Vitest/ws advisories (including dev-server RCE)        | Low for shipped app | Accepted while on the current major; dev server binds `127.0.0.1`. Revisit during the next tooling upgrade.   |
-| Board builds are unsigned/not notarized                              | Operational         | Release workflow does not configure signing. Users may see OS warnings. Requires human credentials to change. |
-| Issue webhook payload compatibility                                  | Informational       | Keep the allowlist field-compatible; document intentional changes.                                            |
+| Finding                                                              | Severity            | Status                                                                                                              |
+| -------------------------------------------------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Config and exports store integration tokens in plaintext             | Medium              | Accepted for local-first 3.x; documented. Encrypting at rest is a future decision.                                  |
+| Tauri content security policy is `null`                              | Medium              | Unresolved. Tightening it requires native validation; do not change without a spec and smoke test.                  |
+| HTTP capability allows any `http(s)` host                            | Medium              | Required for user-configured integrations. Revisit if integrations gain fixed hosts.                                |
+| `react-router` 6.30.6 open-redirect / SSR deserialization advisories | Moderate            | Tracked. App uses `HashRouter` without SSR, reducing exposure; fix requires router major upgrade.                   |
+| `fast-xml-parser` 4.5.7 CPU advisory for unterminated stop-node tags | Low                 | Tracked. CCTray input is user-configured; fix requires parser major upgrade.                                        |
+| Dev-only tinypool, simple-git and other build-tool advisories        | Low for shipped app | Accepted while on the current toolchain; the dev server binds `127.0.0.1`. Revisit during the next tooling upgrade. |
+| Board builds are unsigned/not notarized                              | Operational         | Release workflow does not configure signing. Users may see OS warnings. Requires human credentials to change.       |
+| Issue webhook payload compatibility                                  | Informational       | Keep the allowlist field-compatible; document intentional changes.                                                  |
 
 Do not silently remove functionality or break configuration compatibility to resolve a finding. Record the decision and
 test the migration.

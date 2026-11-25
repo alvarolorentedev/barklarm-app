@@ -47,8 +47,8 @@
     "@types/react-dom": "18.3.0",
     "@typescript-eslint/eslint-plugin": "^5.0.0",
     "@typescript-eslint/parser": "^5.0.0",
-    "@vitejs/plugin-react": "^4.3.1",
-    "@vitest/coverage-v8": "^2.0.5",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^3.2.6",
     "commitizen": "4.3.0",
     "cz-conventional-changelog": "3.3.0",
     "cz-format-extension": "1.5.1",
@@ -56,12 +56,12 @@
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-import": "^2.25.0",
     "husky": "9.1.4",
-    "jsdom": "^24.1.1",
+    "jsdom": "^26.1.0",
     "lint-staged": "15.2.8",
     "prettier": "3.3.3",
     "typescript": "~4.5.4",
-    "vite": "^5.4.2",
-    "vitest": "^2.0.5"
+    "vite": "^5.4.21",
+    "vitest": "^3.2.6"
   },
   "keywords": [],
   "author": {
@@ -92,5 +92,8 @@
     "@rollup/rollup-linux-x64-gnu": "4.20.0",
     "@rollup/rollup-win32-x64-msvc": "4.20.0"
   },
-  "packageManager": "bun@1.4.5"
+  "packageManager": "bun@1.4.5",
+  "overrides": {
+    "ws": "^8.21.0"
+  }
 }
