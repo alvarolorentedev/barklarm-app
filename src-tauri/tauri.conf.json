@@ -5,7 +5,7 @@
   "identifier": "dev.barklarm.app",
   "build": {
     "frontendDist": "../dist/mainview",
-    "devUrl": "http://localhost:1420",
+    "devUrl": "http://127.0.0.1:1420",
     "beforeDevCommand": "bun run dev:renderer",
     "beforeBuildCommand": "bun run build:renderer"
   },
