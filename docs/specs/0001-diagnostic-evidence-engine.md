@@ -135,7 +135,7 @@ Recorded on the Phase 1 mainline commits:
 ```text
 bun install --frozen-lockfile   no changes (681 installs, 660 packages)
 bun run check                   format, lint, tsc, coverage, renderer build, mock isolation: passed
-bun run test:e2e                15 Playwright acceptance tests: passed
+bun run test:e2e                16 Playwright acceptance tests: passed
 bun run audit                   no high/critical vulnerabilities (32 packages checked)
 ```
 
