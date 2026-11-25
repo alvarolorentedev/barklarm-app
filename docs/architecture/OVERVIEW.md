@@ -1,7 +1,6 @@
 # Architecture overview
 
-Status: implemented behavior of Barklarm 3.x plus Phase 1 diagnostic evidence. Proposed future capabilities are
-labelled below and are not part of the current code.
+Status: implemented behavior of Barklarm 4.0, including Phase 1 diagnostic evidence and Phase 2 local intelligence.
 
 ## Runtime shapes
 
@@ -14,6 +13,8 @@ Native (bun run dev / packaged app)
                           -> TrayPresenter -> Tauri tray/menu APIs
                           -> Tauri invoke -> src-tauri/src/store.rs -> config.json
        -> desktop/client -> EvidenceManager -> extensions/<name>/diagnostics -> fetch-adapter -> Tauri HTTP
+                          -> AnalysisManager -> context/prompt/validator -> managed or custom provider
+                          -> Tauri invoke -> intelligence sidecar, model store, credentials
   StrictMode + HashRouter; tray remains the primary surface when the window is closed.
 
 Browser mock (bun run dev:mock)
@@ -36,6 +37,8 @@ contains a separate `client.js` chunk but no mock code.
 | `src/extensions/<name>/component` | Configuration form fields                                                        | Network calls, app state              |
 | `src/core`                        | Identity, config normalization, orchestration, notifications, evidence lifecycle, sanitization, payload allowlists | React, Tauri, DOM |
 | `src/core/diagnostics`            | Evidence manager, limits, sanitization and normalization                         | Source API details                    |
+| `src/core/intelligence`           | Context assembly, prompt, validation, provider adapters, analysis lifecycle       | Native processes, files, credentials  |
+| `src-tauri/src/intelligence`      | Runtime supervision, model files/downloads, consent and credential storage        | React, observer policy                |
 | `src/mainview`                    | Presentation, interaction, contexts, desktop shell                               | Source-specific fetch logic           |
 | `src/mainview/runtime`            | Shared RPC contract and deterministic browser mock                               | Tauri imports, real config            |
 | `src/mainview/desktop`            | Tray, dialogs, notifications, autostart, Tauri bridge                            | Core policy decisions                 |
@@ -88,8 +91,15 @@ already exist for every integration and drive distinct failure notifications. Gi
   runtime exposes the envelope. Evidence content is untrusted data rendered as text.
 - The UI shows a Diagnostic evidence panel inside an expanded failed observer. The setting is opt-in and defaults to
   off. The webhook, tray, notifications and operational status are unchanged.
-- Local analysis with citations and uncertainty is still proposed (Phase 2), not implemented. Do not add it to `State`
-  or the webhook.
+- Analysis is a separate in-memory contract. `AnalysisManager` consumes evidence events, assembles a deterministic
+  bounded context, calls a provider, validates schema/citations/secrets and exposes an `AnalysisSnapshot`. It never
+  changes `State` or the webhook.
+- Intelligence is disabled by default. Managed mode uses a pinned llama.cpp sidecar and a verified on-demand GGUF model.
+  Custom mode uses an OpenAI-compatible endpoint. Remote/private destinations require consent stored outside the config.
+  Connectivity tests never include evidence.
+- Model output is rendered as text, never executed. Unknown citations, invalid JSON, secrets and destructive commands
+  reject the response. See [INTELLIGENCE.md](../engineering/INTELLIGENCE.md).
+- Managed-runtime support is per platform; see [the runtime matrix](../evaluations/0002-runtime-platform-matrix.md).
 
 ## Build and test surfaces
 
@@ -98,6 +108,9 @@ already exist for every integration and drive distinct failure notifications. Gi
 - Native build: `bun run build` -> `src-tauri/target/release/bundle/`.
 - Unit/component tests: Vitest + jsdom, coverage gates in `vitest.config.ts`.
 - Browser acceptance: Playwright against `dev:mock`, artifacts in `test-results/`.
-- Native checks: cargo fmt, clippy, tests in CI; release tagging builds all five bundles.
+- Deterministic evaluations: `bun run test:evals:mock` runs in `bun run check` without a model.
+- Real-model evaluations: explicit `bun run test:evals:local`; results stay under gitignored `evals/results/`.
+- Native checks: cargo fmt, clippy, tests in CI; the sidecar job fetches and smoke-tests the pinned runtime;
+  release tagging builds all five bundles.
 
 Decisions that changed this shape are recorded in [decisions/](decisions/).

@@ -7,8 +7,9 @@ Canonical entry point for coding agents. Read this first, then follow the links 
 
 Barklarm is an MIT-licensed, local-first build and observability radiator for the menu bar. It watches CI pipelines,
 monitors and alert sources, reduces them to one glanceable status, and explains where to look next. Phase 1 adds opt-in,
-bounded diagnostic evidence for supported failures; **no AI inference is implemented yet**. Do not add AI features,
-cloud services or a backend unless an approved task says so.
+bounded diagnostic evidence. Phase 2 adds optional local intelligence with cited, validated analyses. Inference is
+opt-in and never required for monitoring. Do not add cloud services, accounts or a backend unless an approved task says
+so.
 
 ## Read order
 
@@ -21,8 +22,9 @@ cloud services or a backend unless an approved task says so.
    webhooks.
 6. [docs/engineering/AGENTIC_WORKFLOW.md](docs/engineering/AGENTIC_WORKFLOW.md) for task and review flow.
 7. [docs/product/](docs/product/) for why a feature exists.
-8. [docs/engineering/AI_EVALUATION.md](docs/engineering/AI_EVALUATION.md) before touching future diagnostic evidence or
-   evaluation fixtures.
+8. [docs/engineering/INTELLIGENCE.md](docs/engineering/INTELLIGENCE.md) before changing inference, providers, model
+   management or runtime supervision.
+9. [docs/engineering/AI_EVALUATION.md](docs/engineering/AI_EVALUATION.md) before touching evaluation fixtures.
 
 Architectural decisions live in [docs/architecture/decisions/](docs/architecture/decisions/). Check them before
 proposing a new boundary; add one when a consequential decision changes.
@@ -31,8 +33,9 @@ proposing a new boundary; add one when a consequential decision changes.
 
 - Bun 1.4.5 (lockfile is authoritative).
 - Rust 1.90+ and platform Tauri dependencies only for native work.
+- `bun run sidecar:fetch` stages the pinned, checksum-verified llama.cpp runtime for native builds.
 - No credentials or external services are needed for development, unit tests, the mock runtime or browser end-to-end
-  tests.
+  tests. Real-model evaluations are explicit and local.
 
 ## Commands
 
@@ -45,6 +48,9 @@ proposing a new boundary; add one when a consequential decision changes.
 | `bun run test`                                   | Unit and component tests                                                                |
 | `bun run test:cov`                               | Tests with coverage gates                                                               |
 | `bun run test:e2e`                               | Playwright smoke and acceptance tests against the mock runtime                          |
+| `bun run test:evals:mock`                        | Deterministic diagnostic evaluations without a model                                    |
+| `bun run test:evals:local`                       | Explicit real-model evaluation; never part of standard CI                               |
+| `bun run sidecar:fetch`                          | Fetch and verify the pinned llama.cpp runtime for the current target                    |
 | `bun run format:fix` / `lint:fix`                | Auto-fix local issues                                                                   |
 | `bun run rust:fmt` / `rust:clippy` / `rust:test` | Native checks (need a Rust toolchain)                                                   |
 | `bun run audit`                                  | High/critical production dependency audit                                               |
@@ -55,13 +61,14 @@ also require the Rust commands. Never weaken a check to make it pass.
 ## Repository map
 
 ```text
-src/core/              Application behavior: config, observer orchestration, notifications, payloads
+src/core/              Application behavior: config, observers, notifications, evidence, intelligence
+src/core/intelligence/ Context assembly, prompt, validation, provider adapters, analysis lifecycle
 src/extensions/<name>/ One integration: type, observer (I/O), optional diagnostics provider, component, tests
 src/mainview/          React presentation, pages, contexts, desktop shell and runtime facade
 src/mainview/runtime/  Browser mock runtime and shared client contract
 src/mainview/desktop/  Tauri-only shell: tray, dialogs, notifications, autostart, store bridge
-src/types/             Shared contracts (State, Observer, configuration, status)
-src-tauri/             Rust shell, config persistence, native menu/tray integration
+src/types/             Shared contracts (State, Observer, configuration, status, Diagnostics, Intelligence)
+src-tauri/             Rust shell, config persistence, native menu/tray, model/runtime management
 e2e/                   Playwright specs against the mock runtime
 docs/                  Product, architecture, engineering and spec documentation
 fixtures/              Sanitized synthetic fixtures for future diagnostic evaluations
@@ -73,9 +80,11 @@ scripts/               Deterministic repository checks
 - **Observers** retrieve operational status and source-specific evidence. They do not persist, render or decide
   notifications.
 - **TypeScript core** owns orchestration, state transitions, identity, persistence policy and payload boundaries.
+- **Intelligence** owns context assembly, prompts, provider execution and validated interpretation. It never changes
+  operational status or evidence.
 - **React** owns presentation and interaction. Components do not import Tauri APIs.
-- **Tauri/Rust** owns native capabilities and the config file. Only `src/mainview/desktop/**` and the runtime facade may
-  import `@tauri-apps/*`; ESLint enforces this.
+- **Tauri/Rust** owns native capabilities, the config file, model files, credentials and runtime processes. Only
+  `src/mainview/desktop/**` and the runtime facade may import `@tauri-apps/*`; ESLint enforces this.
 - **Mock runtime** implements the same `AppRPCClient` interface as the desktop runtime. It must never import Tauri
   modules, touch real user configuration, or appear in a production bundle.
 
@@ -87,7 +96,11 @@ Use `bun run dev:mock` and select a scenario with `?scenario=<name>`:
 
 `empty`, `healthy`, `failed-builds`, `running-builds`, `unavailable`, `multiple-failures`, `persistence`,
 `diagnostics-complete`, `diagnostics-partial`, `diagnostics-unavailable`, `diagnostics-multiple`,
-`diagnostics-unsupported`, `diagnostics-disabled`, `diagnostics-collecting`, `diagnostics-secrets`.
+`diagnostics-unsupported`, `diagnostics-disabled`, `diagnostics-collecting`, `diagnostics-secrets`,
+`intelligence-disabled`, `intelligence-model-missing`, `intelligence-downloading`, `intelligence-download-failed`,
+`intelligence-ready`, `intelligence-runtime-starting`, `intelligence-analyzing`, `intelligence-complete`,
+`intelligence-insufficient`, `intelligence-invalid-response`, `intelligence-provider-unavailable`,
+`intelligence-remote-consent`, `intelligence-unsupported-hardware`.
 
 - `?scenario=persistence&reset=1` reseeds that scenario; omit `reset` to keep edits across reloads.
 - Mock configuration is stored in `localStorage` under `barklarm.mock.v1.<scenario>` only.
@@ -99,12 +112,13 @@ Scenario details and browser automation guidance: [docs/engineering/DEVELOPMENT.
 ## Testing requirements
 
 - New logic needs a focused unit test; bug fixes need a regression test that fails before the fix.
-- Observer lifecycle, state transitions, notification behavior, persistence, integration adapters and diagnostic
-  evidence collection are the highest-value test areas.
+- Observer lifecycle, state transitions, notification behavior, persistence, integration adapters, diagnostic
+  evidence collection and intelligence lifecycle/validation are the highest-value test areas.
 - Browser tests must be deterministic: no arbitrary sleeps, fixed locale (`en-US`), mock scenarios only.
 - Playwright keeps traces and screenshots on failure in `test-results/`.
 - Coverage gates: 78% lines/statements/functions and 86% branches overall; `src/core/**` must stay at 90%
-  lines/statements/functions and 85% branches. The desktop shell is intentionally thin and validated natively.
+  lines/statements/functions and 85% branches. The desktop shell is intentionally thin and validated natively. The
+  latest gate is recorded in [TESTING.md](docs/engineering/TESTING.md).
 - Do not add meaningless assertions to raise coverage. Add behavior-focused tests or document a gap.
 
 ## Security requirements
@@ -113,6 +127,10 @@ Scenario details and browser automation guidance: [docs/engineering/DEVELOPMENT.
 - Treat integration responses and diagnostic evidence as untrusted data; render it as text, never execute it.
 - Diagnostic collection is opt-in, memory-only and bounded. Sanitize before caching; never add evidence to `State` or
   the issue webhook.
+- Inference is opt-in. Remote/private destinations require explicit consent stored outside the config; API keys use the
+  OS credential store. Evidence is sent only to the selected provider, never to telemetry or the issue webhook.
+- Model files and runtime binaries are pinned and checksum-verified. Never commit weights or binaries. Treat model output
+  as untrusted text and never execute generated commands or URLs.
 - External transmissions use explicit allowlists (`buildIssuePayload`); do not send new fields by default.
 - Configuration changes must stay backward compatible. Legacy configs are migrated on load; preserve import/export
   compatibility.
@@ -132,7 +150,8 @@ Scenario details and browser automation guidance: [docs/engineering/DEVELOPMENT.
 ## Definition of done
 
 - The objective and acceptance criteria in the task are met; non-goals untouched.
-- `bun run check` passes. UI/runtime changes also pass `bun run test:e2e`.
+- `bun run check` passes. UI/runtime changes also pass `bun run test:e2e`. Intelligence changes also pass
+  `bun run test:evals:mock`; real-model claims require a recorded `bun run test:evals:local` run.
 - Native changes pass `rust:fmt`, `rust:clippy` and `rust:test`, or the exact environment limitation is documented with
   the command to run elsewhere.
 - Tests cover new behavior and regressions.

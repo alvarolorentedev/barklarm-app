@@ -1,3 +1,4 @@
+import { CustomProviderConfig, IntelligenceMode } from '../types/Intelligence';
 import { ObserverConfiguration } from '../types/ObserverConfiguration';
 
 export type BarklarmConfig = {
@@ -6,8 +7,18 @@ export type BarklarmConfig = {
   issueGlobalEndpoint?: string;
   sslDisabled?: boolean;
   diagnosticsEnabled?: boolean;
+  intelligenceMode?: IntelligenceMode;
+  intelligenceProvider?: CustomProviderConfig;
   autostart?: boolean;
   autoupdate?: boolean;
+};
+
+export const INTELLIGENCE_PROVIDER_DEFAULTS: Required<CustomProviderConfig> = {
+  endpoint: '',
+  model: '',
+  contextWindow: 8192,
+  maxOutputTokens: 1536,
+  timeoutMs: 120000,
 };
 
 export const DEFAULT_CONFIG: BarklarmConfig = {
@@ -17,9 +28,37 @@ export const DEFAULT_CONFIG: BarklarmConfig = {
   sslDisabled: false,
   // Opt-in: existing installations must not retrieve extra data until asked.
   diagnosticsEnabled: false,
+  // Inference is opt-in and never enabled by import or migration.
+  intelligenceMode: 'disabled',
+  intelligenceProvider: { ...INTELLIGENCE_PROVIDER_DEFAULTS },
   autostart: true,
   autoupdate: true,
 };
+
+export function normalizeIntelligenceMode(value: unknown): IntelligenceMode {
+  return value === 'managed' || value === 'custom' ? value : 'disabled';
+}
+
+function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(number)));
+}
+
+function boundedString(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+export function normalizeIntelligenceProvider(value: unknown): CustomProviderConfig {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as CustomProviderConfig) : {};
+  return {
+    endpoint: boundedString(source.endpoint, 2048),
+    model: boundedString(source.model, 200),
+    contextWindow: boundedInteger(source.contextWindow, INTELLIGENCE_PROVIDER_DEFAULTS.contextWindow, 2048, 32768),
+    maxOutputTokens: boundedInteger(source.maxOutputTokens, INTELLIGENCE_PROVIDER_DEFAULTS.maxOutputTokens, 256, 4096),
+    timeoutMs: boundedInteger(source.timeoutMs, INTELLIGENCE_PROVIDER_DEFAULTS.timeoutMs, 10000, 300000),
+  };
+}
 
 export function normalizeRefreshInterval(value: unknown): number {
   return Math.max(60000, Number(value) || 60000);
@@ -56,5 +95,11 @@ export function normalizeObservables(value: unknown): ObserverConfiguration[] {
 
 export function normalizeConfig(value: unknown): BarklarmConfig {
   const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as BarklarmConfig) : {};
-  return { ...DEFAULT_CONFIG, ...source, observables: normalizeObservables(source.observables) };
+  return {
+    ...DEFAULT_CONFIG,
+    ...source,
+    observables: normalizeObservables(source.observables),
+    intelligenceMode: normalizeIntelligenceMode(source.intelligenceMode),
+    intelligenceProvider: normalizeIntelligenceProvider(source.intelligenceProvider),
+  };
 }

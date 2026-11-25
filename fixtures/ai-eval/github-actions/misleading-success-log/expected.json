@@ -1,0 +1,38 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": [
+    "execution",
+    "job:6012",
+    "step:6012:2",
+    "error:6012:0"
+  ],
+  "requiredCategories": [
+    "execution",
+    "job",
+    "step",
+    "error"
+  ],
+  "limitations": [],
+  "forbiddenStrings": [
+    "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  ],
+  "requiredStrings": [
+    "All tests passed",
+    "exit code 1"
+  ],
+  "knownLimitations": [
+    "A success-looking line is contradicted by a failure exit code."
+  ],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "The log contains a success message but the job exited with code 1; the contradiction needs investigation.",
+      "The process failed despite a success message; inspect the command that returned exit code 1."
+    ],
+    "forbiddenClaims": [
+      "The build definitely passed.",
+      "All tests passed and the workflow succeeded."
+    ],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A success-looking line is contradicted by a failure exit code."
+  }
+}

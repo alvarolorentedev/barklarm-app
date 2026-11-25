@@ -43,9 +43,10 @@
 
 **Native, local, yours.** A Tauri app with a Rust shell and a TypeScript core. Your configuration stays on your machine. No account, no server, no notification plumbing to build.
 
-**Know what failed, not just that it failed.** Opt in to diagnostic evidence for supported failures and inspect failed
-GitHub Actions jobs, steps and bounded error excerpts without leaving Barklarm. Evidence is sanitized, kept in memory
-and never sent to an AI service.
+**Know what failed, and what to do next.** Opt in to diagnostic evidence for supported failures, inspect the failed
+GitHub Actions jobs, steps and bounded error excerpts, and ask Barklarm's built-in local model for a cited explanation.
+Inference is optional and can run entirely on your machine through a managed llama.cpp runtime, or through a provider
+you configure. Evidence is sanitized and bounded; nothing is sent anywhere unless you opt in and approve the destination.
 
 ## How it works
 
@@ -86,6 +87,12 @@ CCTray support covers any server that exposes a `cc.xml` feed, so tools like Jen
   </p>
   <p align="center">
     <img src="docs/media/diagnostics-partial.png" alt="Partial diagnostic evidence with limitations and access errors" width="860" />
+  </p>
+  <p align="center">
+    <img src="docs/media/intelligence-complete.png" alt="AI analysis with cited findings, likely causes, recommendations and uncertainty" width="720" />
+  </p>
+  <p align="center">
+    <img src="docs/media/intelligence-remote-consent.png" alt="Custom provider settings with explicit remote destination consent" width="720" />
   </p>
 </details>
 

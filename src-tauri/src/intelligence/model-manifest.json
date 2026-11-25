@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "models": [
+    {
+      "id": "qwen3-1.7b-instruct-q4-k-m",
+      "displayName": "Qwen3 1.7B Instruct (Q4_K_M)",
+      "version": "d7f544e",
+      "quantization": "Q4_K_M",
+      "fileName": "Qwen3-1.7B-Q4_K_M.gguf",
+      "url": "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/d7f544eead698dbd1f15126ef60b45a1e1933222/Qwen3-1.7B-Q4_K_M.gguf",
+      "sizeBytes": 1107409472,
+      "sha256": "b139949c5bd74937ad8ed8c8cf3d9ffb1e99c866c823204dc42c0d91fa181897",
+      "license": "Apache-2.0",
+      "licenseUrl": "https://huggingface.co/Qwen/Qwen3-1.7B/blob/main/LICENSE",
+      "contextLength": 32768,
+      "recommendedContext": 8192,
+      "minRamGb": 8,
+      "recommendedRamGb": 16,
+      "runtimeMinBuild": 12732
+    }
+  ]
+}

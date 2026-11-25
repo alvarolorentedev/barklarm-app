@@ -15,13 +15,17 @@ The release workflow triggers on tags matching `v*`.
 1. Merge the release-ready change set to `main` with `quality`, `e2e`, `rust` and `audit` green.
 2. Bump versions, run `bun run check`, `bun run test:e2e` and the Rust checks.
 3. Commit (`chore(release): vX.Y.Z`), tag `vX.Y.Z`, push the tag.
-4. `.github/workflows/release.yml` calls the reusable CI workflow, then builds:
+4. `.github/workflows/release.yml` calls the reusable CI workflow. Each build job runs `bun run sidecar:fetch` to stage
+   the pinned, checksum-verified llama.cpp runtime before `bun run build`. The fetch script fails closed on a checksum
+   mismatch.
+5. `.github/workflows/release.yml` builds:
    - macOS arm64 (`macos-15`)
    - macOS x64 (`macos-15-intel`)
    - Linux x64 (`ubuntu-24.04`)
    - Linux arm64 (`ubuntu-24.04-arm`)
    - Windows x64 (`windows-latest`)
-5. The release job downloads bundles and publishes the GitHub release with generated notes.
+6. The release job downloads bundles and publishes the GitHub release with generated notes. Bundles include the runtime
+   libraries and upstream license files; model weights are never bundled and are downloaded by the user on demand.
 
 Workflow permissions are least-privilege: repository contents are read-only except the release job, which needs
 `contents: write`.
@@ -36,9 +40,13 @@ credentials and secrets.
 
 ```sh
 bun install --frozen-lockfile
+bun run sidecar:fetch
 bun run build
 ls src-tauri/target/release/bundle/
 ```
+
+Managed-runtime packages must additionally verify that the sidecar and its libraries launch with the bundled model. State
+the exact platform/architecture and do not claim cross-platform execution from one host.
 
 This requires the platform Tauri dependencies and takes several minutes. Agents may validate TypeScript, browser
 behavior and Rust checks without producing installers; report the native build as unrun if it was not executed.

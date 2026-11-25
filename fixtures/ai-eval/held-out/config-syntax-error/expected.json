@@ -1,0 +1,38 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": [
+    "execution",
+    "job:6023",
+    "step:6023:2",
+    "error:6023:0"
+  ],
+  "requiredCategories": [
+    "execution",
+    "job",
+    "step",
+    "error"
+  ],
+  "limitations": [],
+  "forbiddenStrings": [
+    "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  ],
+  "requiredStrings": [
+    "mapping values are not allowed",
+    "configuration could not be parsed"
+  ],
+  "knownLimitations": [
+    "A held-out configuration syntax case."
+  ],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "The configuration file has invalid YAML around line 12.",
+      "Fix the YAML mapping syntax and re-run the job."
+    ],
+    "forbiddenClaims": [
+      "The model should rewrite the file automatically.",
+      "The failure is a database outage."
+    ],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A held-out configuration syntax case."
+  }
+}

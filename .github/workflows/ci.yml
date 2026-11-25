@@ -75,15 +75,36 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
       - run:
           sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
           librsvg2-dev patchelf libssl-dev
+      - run: bun run sidecar:fetch
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  sidecar:
+    name: Native sidecar
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries
+          key: ${{ runner.os }}-llama-b12732
+      - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
 
   audit:
     name: Production dependency audit

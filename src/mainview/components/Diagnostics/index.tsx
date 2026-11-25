@@ -3,6 +3,7 @@ import { ExternalLink, RefreshCw } from 'lucide-react';
 import { translate } from '../../i18n';
 import { client } from '../../rpc-client';
 import { DiagnosticSnapshot, DiagnosticStatus, EvidenceItem } from '../../../types/Diagnostics';
+import { AnalysisSection } from './Analysis';
 
 const STATUS_LABEL: Record<DiagnosticStatus, string> = {
   unsupported: 'Unsupported',
@@ -130,130 +131,142 @@ export const DiagnosticPanel = ({ observerId, failureKey }: DiagnosticPanelProps
   const evidence = snapshot?.evidence;
 
   return (
-    <section className="diagnostics" aria-label={translate('Diagnostic evidence')} aria-busy={busy}>
-      <div className="diagnostics-header">
-        <div>
-          <h3 className="diagnostics-title">{translate('Diagnostic evidence')}</h3>
-          <p className="diagnostics-note">{translate('Source evidence, not an AI explanation.')}</p>
-        </div>
-        {canCollect ? (
-          <button type="button" className="button diagnostics-action" onClick={() => void recollect()}>
-            <RefreshCw size={12} aria-hidden="true" />
-            {status === 'available' || status === 'partial'
-              ? translate('Collect again')
-              : translate('Collect evidence')}
-          </button>
-        ) : null}
-      </div>
-
-      {status ? (
-        <span className={`status-pill diagnostics-status ${STATUS_CLASS[status]}`}>
-          <span className="status-pill-dot" aria-hidden="true" />
-          {translate(STATUS_LABEL[status])}
-        </span>
-      ) : null}
-
-      <div className="diagnostics-body" aria-live="polite">
-        {error ? (
-          <div className="diagnostics-error">
-            <p className="diagnostics-message">{translate('Diagnostic evidence could not be loaded.')}</p>
-            <button
-              type="button"
-              className="button diagnostics-action"
-              onClick={() => {
-                setLoading(true);
-                void load();
-              }}
-            >
-              {translate('Retry')}
-            </button>
+    <>
+      <section className="diagnostics" aria-label={translate('Diagnostic evidence')} aria-busy={busy}>
+        <div className="diagnostics-header">
+          <div>
+            <h3 className="diagnostics-title">{translate('Diagnostic evidence')}</h3>
+            <p className="diagnostics-note">{translate('Source evidence, not an AI explanation.')}</p>
           </div>
+          {canCollect ? (
+            <button type="button" className="button diagnostics-action" onClick={() => void recollect()}>
+              <RefreshCw size={12} aria-hidden="true" />
+              {status === 'available' || status === 'partial'
+                ? translate('Collect again')
+                : translate('Collect evidence')}
+            </button>
+          ) : null}
+        </div>
+
+        {status ? (
+          <span className={`status-pill diagnostics-status ${STATUS_CLASS[status]}`}>
+            <span className="status-pill-dot" aria-hidden="true" />
+            {translate(STATUS_LABEL[status])}
+          </span>
         ) : null}
 
-        {loading && !snapshot ? (
-          <p className="diagnostics-message" role="status">
-            {translate('Loading diagnostic evidence…')}
-          </p>
-        ) : null}
+        <div className="diagnostics-body" aria-live="polite">
+          {error ? (
+            <div className="diagnostics-error">
+              <p className="diagnostics-message">{translate('Diagnostic evidence could not be loaded.')}</p>
+              <button
+                type="button"
+                className="button diagnostics-action"
+                onClick={() => {
+                  setLoading(true);
+                  void load();
+                }}
+              >
+                {translate('Retry')}
+              </button>
+            </div>
+          ) : null}
 
-        {!loading && status === 'disabled' ? (
-          <p className="diagnostics-message">
-            {translate('Diagnostics are disabled. Enable them in General settings.')}
-          </p>
-        ) : null}
+          {loading && !snapshot ? (
+            <p className="diagnostics-message" role="status">
+              {translate('Loading diagnostic evidence…')}
+            </p>
+          ) : null}
 
-        {!loading && status === 'unsupported' ? (
-          <p className="diagnostics-message">{translate('This integration does not provide diagnostic evidence.')}</p>
-        ) : null}
+          {!loading && status === 'disabled' ? (
+            <p className="diagnostics-message">
+              {translate('Diagnostics are disabled. Enable them in General settings.')}
+            </p>
+          ) : null}
 
-        {!loading && (status === 'collecting' || status === 'queued') ? (
-          <p className="diagnostics-message" role="status">
-            {translate('Collecting diagnostic evidence…')}
-          </p>
-        ) : null}
+          {!loading && status === 'unsupported' ? (
+            <p className="diagnostics-message">{translate('This integration does not provide diagnostic evidence.')}</p>
+          ) : null}
 
-        {!loading && status === 'not_collected' ? (
-          <p className="diagnostics-message">{translate('No diagnostic evidence has been collected yet.')}</p>
-        ) : null}
+          {!loading && (status === 'collecting' || status === 'queued') ? (
+            <p className="diagnostics-message" role="status">
+              {translate('Collecting diagnostic evidence…')}
+            </p>
+          ) : null}
 
-        {!loading && status === 'failed' ? (
-          <p className="diagnostics-message">{translate('Evidence collection failed.')}</p>
-        ) : null}
+          {!loading && status === 'not_collected' ? (
+            <p className="diagnostics-message">{translate('No diagnostic evidence has been collected yet.')}</p>
+          ) : null}
 
-        {!loading && (status === 'available' || status === 'partial' || status === 'unavailable') ? (
-          evidence ? (
-            <>
-              <p className="diagnostics-summary">{evidence.summary}</p>
+          {!loading && status === 'failed' ? (
+            <p className="diagnostics-message">{translate('Evidence collection failed.')}</p>
+          ) : null}
 
-              {evidence.limitations.length > 0 ? (
-                <div className="diagnostics-limitations">
-                  <h4>{translate('Limitations')}</h4>
-                  <ul>
-                    {evidence.limitations.map((limitation) => (
-                      <li key={limitation}>{translate(LIMITATION_LABEL[limitation] || limitation)}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
+          {!loading && (status === 'available' || status === 'partial' || status === 'unavailable') ? (
+            evidence ? (
+              <>
+                <p className="diagnostics-summary">{evidence.summary}</p>
 
-              {evidence.items.length > 0 ? (
-                <div className="evidence-list">
-                  {evidence.items.map((item) => {
-                    const sourceUrl = item.source?.url;
-                    return (
-                      <article className="evidence-item" key={item.id}>
-                        <div className="evidence-item-header">
-                          <span className="evidence-category">{translate(CATEGORY_LABEL[item.category])}</span>
-                          <h4 className="evidence-title">{item.title}</h4>
-                          {item.timestamp ? <span className="evidence-time">{item.timestamp}</span> : null}
-                        </div>
-                        <pre className="evidence-content">{item.content}</pre>
-                        {item.truncation ? <p className="evidence-note">{translate('Content truncated')}</p> : null}
-                        {sourceUrl ? (
-                          <button
-                            type="button"
-                            className="link-button"
-                            onClick={() => {
-                              void client.openExternal(sourceUrl).catch(() => undefined);
-                            }}
-                          >
-                            {translate('Open source')}
-                            <ExternalLink size={11} aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="diagnostics-message">{translate('No diagnostic evidence is available.')}</p>
-              )}
-            </>
-          ) : (
-            <p className="diagnostics-message">{translate('No diagnostic evidence is available.')}</p>
-          )
-        ) : null}
-      </div>
-    </section>
+                {evidence.limitations.length > 0 ? (
+                  <div className="diagnostics-limitations">
+                    <h4>{translate('Limitations')}</h4>
+                    <ul>
+                      {evidence.limitations.map((limitation) => (
+                        <li key={limitation}>{translate(LIMITATION_LABEL[limitation] || limitation)}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+
+                {evidence.items.length > 0 ? (
+                  <div className="evidence-list">
+                    {evidence.items.map((item) => {
+                      const sourceUrl = item.source?.url;
+                      return (
+                        <article className="evidence-item" key={item.id} id={`evidence-${item.id}`} tabIndex={-1}>
+                          <div className="evidence-item-header">
+                            <span className="evidence-category">{translate(CATEGORY_LABEL[item.category])}</span>
+                            <h4 className="evidence-title">{item.title}</h4>
+                            {item.timestamp ? <span className="evidence-time">{item.timestamp}</span> : null}
+                          </div>
+                          <pre className="evidence-content">{item.content}</pre>
+                          {item.truncation ? <p className="evidence-note">{translate('Content truncated')}</p> : null}
+                          {sourceUrl ? (
+                            <button
+                              type="button"
+                              className="link-button"
+                              onClick={() => {
+                                void client.openExternal(sourceUrl).catch(() => undefined);
+                              }}
+                            >
+                              {translate('Open source')}
+                              <ExternalLink size={11} aria-hidden="true" />
+                            </button>
+                          ) : null}
+                        </article>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="diagnostics-message">{translate('No diagnostic evidence is available.')}</p>
+                )}
+              </>
+            ) : (
+              <p className="diagnostics-message">{translate('No diagnostic evidence is available.')}</p>
+            )
+          ) : null}
+        </div>
+      </section>
+      <AnalysisSection
+        observerId={observerId}
+        failureKey={`${failureKey || ''}:${evidence?.collectedAt || ''}`}
+        onFocusEvidence={(evidenceId) => {
+          const target = document.getElementById(`evidence-${evidenceId}`);
+          if (!target) return;
+          target.scrollIntoView({ block: 'center' });
+          target.focus({ preventScroll: true });
+        }}
+      />
+    </>
   );
 };

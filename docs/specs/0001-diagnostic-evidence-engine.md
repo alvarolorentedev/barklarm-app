@@ -89,7 +89,8 @@ Captured: workflow/repository/run/attempt/conclusion/branch/SHA/timestamps/links
 log excerpts, extracted error signals, completeness and limitations. Not captured as structured fields: full raw logs,
 actor identity, email, runner hostnames, tokens, unrelated jobs, workflow archives. Log excerpts may contain incidental
 personal or host data; they are bounded and sanitized, not guaranteed anonymous. Redaction is applied before caching and before runtime
-exposure. No disk, database, telemetry or webhook transmission.
+exposure. Phase 1 performs no disk, database, telemetry or webhook transmission. Phase 2 may send sanitized evidence to a
+user-selected inference provider after opt-in; see spec 0002.
 
 ## Architecture and boundaries
 

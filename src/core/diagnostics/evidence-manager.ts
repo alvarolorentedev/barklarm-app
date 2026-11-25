@@ -21,6 +21,11 @@ export type DiagnosticObserverSource = {
   scope?: string;
 };
 
+export type EvidenceManagerEvent =
+  | { type: 'available'; evidence: DiagnosticEvidence }
+  | { type: 'cleared'; observerId: string }
+  | { type: 'reset' };
+
 type CachedEvidence = {
   key: string;
   evidence: DiagnosticEvidence;
@@ -43,6 +48,7 @@ export type EvidenceManagerOptions = {
   enabled?: boolean;
   limits?: DiagnosticLimits;
   now?: () => Date;
+  onEvent?: (event: EvidenceManagerEvent) => void;
 };
 
 function cloneEvidence(evidence: DiagnosticEvidence): DiagnosticEvidence {
@@ -74,11 +80,13 @@ export class EvidenceManager {
   private stopped = false;
   private readonly limits: DiagnosticLimits;
   private readonly now: () => Date;
+  private readonly onEvent?: (event: EvidenceManagerEvent) => void;
 
   constructor(options: EvidenceManagerOptions = {}) {
     this.enabled = options.enabled ?? false;
     this.limits = options.limits ?? DIAGNOSTIC_LIMITS;
     this.now = options.now ?? (() => new Date());
+    this.onEvent = options.onEvent;
   }
 
   isEnabled(): boolean {
@@ -105,12 +113,6 @@ export class EvidenceManager {
       const replacement = next.get(id);
       if (!replacement || this.scopeOf(replacement) !== this.scopeOf(current)) {
         this.clearObserver(id);
-      }
-    }
-    for (const id of Array.from(this.cache.keys())) {
-      if (!next.has(id)) {
-        this.cache.delete(id);
-        this.seen.delete(id);
       }
     }
     this.sources = next;
@@ -173,6 +175,17 @@ export class EvidenceManager {
     }
     if (this.failed.get(observerId) === key) return { status: 'failed' };
     return { status: 'not_collected' };
+  }
+
+  /** Bounded snapshot used when intelligence is enabled after evidence exists. */
+  getAvailableEvidence(): DiagnosticEvidence[] {
+    if (!this.enabled || this.stopped) return [];
+    const output: DiagnosticEvidence[] = [];
+    for (const cached of this.cache.values()) {
+      if (this.expired(cached)) continue;
+      output.push(cloneEvidence(cached.evidence));
+    }
+    return output;
   }
 
   recollect(observerId: string): void {
@@ -336,6 +349,7 @@ export class EvidenceManager {
       this.seen.set(source.id, { key: item.key, at: collectedAt });
       this.failed.delete(source.id);
       this.evict();
+      this.emit({ type: 'available', evidence: cloneEvidence(evidence) });
     } finally {
       clearTimeout(timeout);
       if (this.pending.get(source.id) === pending) this.pending.delete(source.id);
@@ -393,11 +407,17 @@ export class EvidenceManager {
   }
 
   private clearObserver(observerId: string): void {
+    const existed =
+      this.pending.has(observerId) ||
+      this.cache.has(observerId) ||
+      this.failed.has(observerId) ||
+      this.lastFailures.has(observerId);
     this.abort(observerId);
     this.cache.delete(observerId);
     this.seen.delete(observerId);
     this.failed.delete(observerId);
     this.lastFailures.delete(observerId);
+    if (existed) this.emit({ type: 'cleared', observerId });
   }
 
   private reset(): void {
@@ -408,6 +428,16 @@ export class EvidenceManager {
     this.failed.clear();
     this.lastFailures.clear();
     this.resolveIdle();
+    this.emit({ type: 'reset' });
+  }
+
+  private emit(event: EvidenceManagerEvent): void {
+    if (!this.onEvent || this.stopped) return;
+    try {
+      this.onEvent(event);
+    } catch {
+      // A consumer must never break collection or polling.
+    }
   }
 
   private resolveIdle(): void {

@@ -4,8 +4,9 @@ These principles are specific to Barklarm. They resolve trade-offs; they are not
 
 ## Local-first, no hidden transmission
 
-Status, evidence and configuration stay on the machine unless the user configures an external endpoint. New fields are
-not transmitted by default. Any new outbound payload needs an allowlist and a test.
+Status, evidence, analysis and configuration stay on the machine unless the user opts into an external inference
+endpoint. Built-in inference is local. New fields are not transmitted by default; any outbound payload needs an allowlist,
+explicit consent where applicable and a test.
 
 ## Deterministic before clever
 
@@ -29,8 +30,9 @@ breaking configuration change requires explicit approval.
 
 ## Evidence, not guesswork
 
-Operational status is separate from diagnostic evidence and future analysis. Do not collapse them into one type or one
-screen. Preserve source-specific failure identifiers so distinct failures remain distinct.
+Operational status, diagnostic evidence and generated analysis are separate contracts. Do not collapse them into one type
+or one mutable object. Preserve source-specific failure identifiers so distinct failures remain distinct, and distinguish
+facts from hypotheses in every analysis.
 
 ## Fast, honest feedback
 

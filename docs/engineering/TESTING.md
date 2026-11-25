@@ -15,6 +15,8 @@ compiles; it is complete when the relevant checks prove the required behavior.
 | Mainview pages/components | `src/mainview/**/*.test.tsx`                 | Testing Library              |
 | Browser acceptance        | `e2e/*.spec.ts`                              | Playwright + mock runtime    |
 | Native                    | `src-tauri/src/**` `#[cfg(test)]`            | cargo test                   |
+| Diagnostic evaluation     | `scripts/evals/` + `fixtures/ai-eval/`       | bun run test:evals:mock      |
+| Real-model evaluation     | `scripts/evals/` + local provider            | bun run test:evals:local     |
 
 ## Commands
 
@@ -22,7 +24,9 @@ compiles; it is complete when the relevant checks prove the required behavior.
 bun run test          # all unit/component tests
 bun run test:cov      # same with coverage gates
 bun run test:e2e      # Playwright against dev:mock
-bun run check         # full repository gate
+bun run check         # full repository gate, includes deterministic evals
+bun run test:evals:mock  # deterministic evaluations only
+bun run test:evals:local # explicit real model, not CI
 ```
 
 Run a single file with `bunx vitest run src/core/observer-manager.test.ts`. Run a single Playwright spec with
@@ -30,9 +34,10 @@ Run a single file with `bunx vitest run src/core/observer-manager.test.ts`. Run 
 
 ## Coverage
 
-Verified baseline at Phase 0 completion: 80.3% lines/statements, 88.8% branches, 81.3% functions across `src/**` (core:
-95.5% lines/statements, 94.0% branches, 90.9% functions). Phase 1 verified: 87.3% lines/statements, 87.43% branches,
-85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Gates in `vitest.config.ts`:
+Phase 0 baseline: 80.3% lines/statements, 88.8% branches, 81.3% functions. Phase 1: 87.3% lines/statements, 87.43%
+branches, 85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Phase 2: 86.91%
+lines/statements, 86.05% branches, 87.09% functions overall; all gates passed. The new code is covered by focused
+intelligence tests, not exclusions. Gates in `vitest.config.ts`:
 
 - overall: 78% lines, statements and functions; 86% branches;
 - `src/core/**`: 90% lines, statements and functions; 85% branches.
@@ -56,8 +61,11 @@ Priority areas for new work:
 6. **Error handling** — thrown fetch, invalid JSON, unknown integration type.
 7. **Diagnostic evidence** — provider discovery, exact run attempt, jobs/steps, log extraction, sanitization,
    truncation, redirects, rate limits, dedupe, retry, timeout, stale results, eviction and unsupported integrations.
-8. **Browser journeys** — startup, navigation, configuration edit, reload persistence, failure and unavailable
-   presentation, diagnostic settings and evidence states.
+8. **Intelligence** — context budgets/order/dedup/redaction, prompt versioning, provider errors and fallbacks,
+   citations, schemas, repair, secret/destructive-output rejection, queue/cache/dedupe/stale/cancel/disable behavior,
+   endpoint and consent policy, insufficient-evidence policy and managed provider lifecycle.
+9. **Browser journeys** — startup, navigation, configuration edit, reload persistence, failure and unavailable
+   presentation, diagnostic settings and evidence states, all 13 intelligence scenarios.
 
 ## Unit conventions
 
@@ -85,13 +93,13 @@ CI. Native checks require the platform webview packages listed in [DEVELOPMENT.m
 
 ## Fixtures
 
-Browser scenarios are synthetic, deterministic fixtures in `src/mainview/runtime/mock.ts`. Seven diagnostic fixtures
-live under `fixtures/ai-eval/github-actions/` and are executed by
+Browser scenarios are synthetic, deterministic fixtures in `src/mainview/runtime/mock.ts`. Thirteen diagnostic fixtures
+and three held-out fixtures live under `fixtures/ai-eval/` and are executed by
 `src/extensions/github/diagnostics/fixtures.test.ts`: the real provider and normalizer run against synthetic API
 responses, then assert required evidence IDs, categories, limitations, forbidden strings and completeness.
 
 Fixtures are sanitized and synthetic. Never use real tokens, customer logs or personal data in a fixture, screenshot or
-trace. The case `expected.json` keeps observable evidence separate from future AI rubric metadata.
+trace. The case `expected.json` keeps observable evidence separate from AI rubric metadata used by real-model review.
 
 ## Honesty
 

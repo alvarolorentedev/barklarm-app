@@ -26,6 +26,15 @@ bun run dev:mock   # browser app with deterministic data
 `bun run dev` starts Vite on `127.0.0.1:1420` and then the Tauri shell. The window is hidden outside debug builds and
 the tray remains available.
 
+For managed inference, stage the pinned runtime once per target:
+
+```sh
+bun run sidecar:fetch
+```
+
+The script downloads the pinned llama.cpp build, verifies its SHA-256 and places the binary and libraries under
+`src-tauri/binaries/` (gitignored). Standard TypeScript, browser and deterministic evaluation work does not need it.
+
 ### Plain renderer debugging
 
 `bun run dev:renderer` serves the renderer without Tauri. The runtime facade will try the desktop runtime and fail
@@ -55,6 +64,19 @@ Select a scenario with a query parameter:
 | `diagnostics-disabled`    | Failed workflow while diagnostics are off; enabling reveals them |
 | `diagnostics-collecting`  | Collection in progress, then available                           |
 | `diagnostics-secrets`     | Synthetic credential-like content already shown as redacted      |
+| `intelligence-disabled`   | Failed build with intelligence disabled                          |
+| `intelligence-model-missing` | Built-in mode selected without an installed model             |
+| `intelligence-downloading` | Model download progress                                         |
+| `intelligence-download-failed` | Failed model download                                       |
+| `intelligence-ready`      | Verified model and ready runtime                                |
+| `intelligence-runtime-starting` | Runtime starting                                           |
+| `intelligence-analyzing`  | Queued/analyzing analysis, then available                       |
+| `intelligence-complete`   | Validated diagnosis with citations and recommendations          |
+| `intelligence-insufficient` | No usable evidence for a diagnosis                            |
+| `intelligence-invalid-response` | Model output rejected by validation                        |
+| `intelligence-provider-unavailable` | Custom provider unreachable                            |
+| `intelligence-remote-consent` | Remote destination awaiting consent                         |
+| `intelligence-unsupported-hardware` | Managed runtime unsupported on this profile          |
 
 Examples:
 
@@ -74,8 +96,8 @@ observer row to inspect the evidence panel. None of these scenarios make network
 - Mock states are derived from the stored observers, so adding, removing or renaming an observer is reflected
   deterministically.
 - Scenarios live in `src/mainview/runtime/mock.ts`; add one there and extend `src/mainview/runtime/mock.test.ts`.
-- Diagnostic evidence is collected by the desktop runtime only; the mock serves deterministic envelopes and never
-  imports Tauri or performs I/O.
+- Diagnostic evidence and intelligence are collected/served by the desktop runtime only; the mock serves deterministic
+  envelopes and analysis snapshots and never imports Tauri, downloads models, spawns processes or performs inference.
 
 ### Production isolation
 
@@ -150,8 +172,9 @@ These are tracked, not silently ignored:
 - The renderer has two i18n helpers (`src/core/i18n.ts` initialized by the desktop runtime and
   `src/mainview/i18n.ts` reading `navigator.language`). They share the same translation files; unify
   them in a dedicated task.
-- The Tauri CSP is unset and the HTTP capability allows any HTTP(S) host; both are documented security
-  findings in [SECURITY.md](SECURITY.md).
+- The CSP is set but not interactively validated on every release target; the HTTP capability still allows any HTTP(S)
+  host for user-configured integrations. Both are documented in [SECURITY.md](SECURITY.md).
+- Managed runtime execution is verified locally on macOS arm64 only; other targets require native CI/human smoke tests.
 - The native build warns that the bundle identifier ends in `.app`; changing it would break update
   identity and needs a migration decision.
 - `.codeclimate.yml` still references an old renderer path and ESLint 6 and is not used by CI.

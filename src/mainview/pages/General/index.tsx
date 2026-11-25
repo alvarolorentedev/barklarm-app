@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { LogOut } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { SettingsGroup, SettingsRow } from '../../components/SettingsGroup';
 import Switch from '../../components/fields/Switch';
 import { translate } from '../../i18n';
 import { storage } from './helpers/storage';
+import { IntelligenceSettings } from './Intelligence';
 
 export const General = () => {
   const [sslDisabled, setSslDisabled] = useState(false);
@@ -12,6 +13,7 @@ export const General = () => {
   const [issueGlobalEndpoint, setIssueGlobalEndpoint] = useState('');
   const [autostart, setAutostart] = useState(true);
   const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
+  const dirty = useRef(false);
   const {
     getSslDisabled,
     saveSslDisabled,
@@ -36,6 +38,7 @@ export const General = () => {
       getAutostart(),
       getDiagnosticsEnabled(),
     ]).then(([ssl, interval, endpoint, startAtLogin, diagnostics]) => {
+      if (dirty.current) return;
       setSslDisabled(ssl);
       setRefreshInterval(interval);
       setIssueGlobalEndpoint(endpoint);
@@ -47,6 +50,7 @@ export const General = () => {
   const updateRefreshInterval = (event: React.ChangeEvent<HTMLInputElement>) => {
     const targetInterval = Number(event.target.value) * 60000;
     if (!Number.isFinite(targetInterval) || targetInterval < 60000) return;
+    dirty.current = true;
     saveRefreshInterval(targetInterval);
     setRefreshInterval(targetInterval);
   };
@@ -81,6 +85,7 @@ export const General = () => {
             type="text"
             value={issueGlobalEndpoint}
             onChange={(event) => {
+              dirty.current = true;
               saveissueGlobalEndpoint(event.target.value);
               setIssueGlobalEndpoint(event.target.value);
             }}
@@ -88,6 +93,10 @@ export const General = () => {
             aria-label={translate('Issue endpoint')}
           />
         </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Intelligence')}>
+        <IntelligenceSettings />
       </SettingsGroup>
 
       <SettingsGroup title={translate('Diagnostics')}>
@@ -101,6 +110,7 @@ export const General = () => {
             checked={diagnosticsEnabled}
             ariaLabel={translate('Diagnostic evidence')}
             onChange={(event) => {
+              dirty.current = true;
               saveDiagnosticsEnabled(event.target.checked);
               setDiagnosticsEnabled(event.target.checked);
             }}
@@ -114,6 +124,7 @@ export const General = () => {
             checked={autostart}
             ariaLabel={translate('Start at login')}
             onChange={(event) => {
+              dirty.current = true;
               saveAutostart(event.target.checked);
               setAutostart(event.target.checked);
             }}
@@ -143,6 +154,7 @@ export const General = () => {
             checked={sslDisabled}
             ariaLabel={translate('Disable SSL verification')}
             onChange={(event) => {
+              dirty.current = true;
               saveSslDisabled(event.target.checked);
               setSslDisabled(event.target.checked);
             }}

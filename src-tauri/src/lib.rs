@@ -1,3 +1,4 @@
+mod intelligence;
 mod store;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -90,7 +91,8 @@ fn show_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
+        .manage(intelligence::IntelligenceState::default())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_autostart::init(
@@ -108,6 +110,18 @@ pub fn run() {
             log_frontend,
             show_window,
             menu_images_supported,
+            intelligence::intelligence_status,
+            intelligence::start_model_download,
+            intelligence::cancel_model_download,
+            intelligence::remove_model,
+            intelligence::ensure_managed_runtime,
+            intelligence::stop_managed_runtime,
+            intelligence::get_provider_key,
+            intelligence::set_provider_key,
+            intelligence::delete_provider_key,
+            intelligence::has_provider_key,
+            intelligence::is_destination_approved,
+            intelligence::approve_destination,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]
@@ -142,8 +156,16 @@ pub fn run() {
                 )?;
             }
 
+            intelligence::cleanup_stale(app.handle());
+            intelligence::spawn_idle_reaper(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application");
+
+    app.run(|handle, event| {
+        if let tauri::RunEvent::Exit = event {
+            intelligence::shutdown(handle);
+        }
+    });
 }

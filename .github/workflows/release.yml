@@ -29,6 +29,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
       - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
@@ -49,6 +51,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
       - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
@@ -72,6 +76,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
           librsvg2-dev patchelf libssl-dev
       - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
       - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
@@ -95,6 +101,8 @@ jobs:
           sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev
           librsvg2-dev patchelf libssl-dev
       - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
       - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
@@ -115,6 +123,8 @@ jobs:
         with:
           workspaces: src-tauri -> target
       - run: bun install --frozen-lockfile
+      - run: bun run sidecar:fetch
+      - run: bun run sidecar:smoke
       - run: bun run build
       - uses: actions/upload-artifact@v4
         with:
