@@ -1,0 +1,52 @@
+{
+  "synthetic": true,
+  "category": "insufficient-evidence",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-insufficient-evidence",
+    "type": "githubAction",
+    "alias": "Nightly",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "nightly.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "5005:1",
+    "link": "https://github.com/acme/api/actions/runs/5005"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 5005,
+      "run_attempt": 1,
+      "name": "Nightly",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "main",
+      "head_sha": "0d9f4c1",
+      "event": "schedule",
+      "created_at": "2026-01-15T14:00:00Z",
+      "run_started_at": "2026-01-15T14:00:05Z",
+      "updated_at": "2026-01-15T14:00:30Z",
+      "html_url": "https://github.com/acme/api/actions/runs/5005",
+      "repository": { "full_name": "acme/api" }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 6005,
+          "name": "nightly",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/5005/job/6005",
+          "started_at": "2026-01-15T14:00:10Z",
+          "completed_at": "2026-01-15T14:00:20Z",
+          "steps": []
+        }
+      ]
+    },
+    "logs": {
+      "6005": "   \n"
+    }
+  }
+}

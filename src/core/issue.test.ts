@@ -37,6 +37,24 @@ describe('issue payload', () => {
     expect(payload).not.toHaveProperty('error');
   });
 
+  it('never transmits diagnostic evidence', () => {
+    const payload = buildIssuePayload({
+      name: 'API build',
+      status: Status.FAILURE,
+      link: 'https://example.test/run/1',
+      error: { id: 'run-1:1', description: 'Workflow failed' },
+      diagnosticEvidence: { items: [{ content: 'secret log excerpt' }] },
+      evidence: { items: [{ content: 'must not leak' }] },
+    } as any);
+
+    expect(payload).toEqual({
+      name: 'API build',
+      status: Status.FAILURE,
+      link: 'https://example.test/run/1',
+      error: { id: 'run-1:1', description: 'Workflow failed' },
+    });
+  });
+
   it('accepts only HTTP and HTTPS endpoints', () => {
     expect(isHttpUrl('https://hooks.example.test/issue')).toBe(true);
     expect(isHttpUrl('http://localhost:8080/issue')).toBe(true);

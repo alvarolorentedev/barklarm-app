@@ -1,0 +1,18 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": ["execution", "job:6004", "step:6004:2", "error:6004:0"],
+  "requiredCategories": ["execution", "job", "step", "error"],
+  "limitations": [],
+  "forbiddenStrings": ["ghp_SYNTHETICCONFIGTOKEN1234567890"],
+  "requiredStrings": ["error TS2322", "src/checkout.ts(42,7)"],
+  "knownLimitations": ["The fixture does not include the source file, only the compiler diagnostic."],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "TypeScript reports a string assigned to a number at src/checkout.ts line 42.",
+      "The typecheck step failed on a TS2322 assignment error in src/checkout.ts."
+    ],
+    "forbiddenClaims": ["The checkout service returned HTTP 500.", "The user's card was declined."],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A future model must cite error:6004:0 and not infer runtime behavior from a compile error."
+  }
+}

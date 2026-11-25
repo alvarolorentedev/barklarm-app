@@ -4,6 +4,7 @@ import { State } from '../types/State';
 import { Status } from '../types/Status';
 import { ObserversBuildersMap } from '../extensions/observerBuiderMap';
 import { normalizeObservables } from './config';
+import { DiagnosticObserverSource, EvidenceManager } from './diagnostics/evidence-manager';
 import { NotificationManager } from './notification';
 
 export interface ObserverPresenter {
@@ -23,6 +24,23 @@ async function defaultFactory(config: ObserverConfiguration): Promise<Observer |
   return build ? build(config) : undefined;
 }
 
+function diagnosticSource(config: ObserverConfiguration, observer: Observer): DiagnosticObserverSource | undefined {
+  if (!config.id) return undefined;
+  try {
+    return {
+      id: config.id,
+      config,
+      provider: observer.getDiagnosticProvider?.(),
+      scope: observer.getDiagnosticScope?.(),
+    };
+  } catch {
+    // A broken optional capability must not break monitoring, and the error
+    // could contain configuration; log no details.
+    console.error('Failed to initialize diagnostics for one observer.');
+    return { id: config.id, config };
+  }
+}
+
 export class ObserverManager {
   private entries: ObserverEntry[] = [];
   private observersState: State[] = [];
@@ -34,7 +52,8 @@ export class ObserverManager {
   constructor(
     private readonly presenter: ObserverPresenter,
     private readonly notifications: NotificationManager,
-    private readonly factory: ObserverFactory = defaultFactory
+    private readonly factory: ObserverFactory = defaultFactory,
+    private readonly evidence?: EvidenceManager
   ) {}
 
   private calculateGlobalStatus(states: State[]): Status {
@@ -63,6 +82,15 @@ export class ObserverManager {
       // A newer configuration was applied while observers were being built.
       if (generation !== this.generation) return;
       this.entries = entries.filter(Boolean) as ObserverEntry[];
+      try {
+        this.evidence?.setObservers(
+          this.entries
+            .map(({ config, observer }) => diagnosticSource(config, observer))
+            .filter((source): source is DiagnosticObserverSource => !!source)
+        );
+      } catch {
+        console.error('Failed to configure diagnostics for an observer.');
+      }
       // Invalidate refreshes that started with the previous entries while the
       // replacement observers were still being built.
       this.generation += 1;
@@ -117,6 +145,13 @@ export class ObserverManager {
       this.notifications.updateNotifications(oldStates, this.observersState);
       this.presenter.updateImage(globalState);
       this.presenter.updateMenu(this.observersState);
+      try {
+        // Scheduling is synchronous and the provider work is detached, so a slow
+        // diagnostic source never delays polling, notifications or the tray.
+        this.evidence?.observe(this.observersState);
+      } catch {
+        console.error('Failed to schedule diagnostics.');
+      }
     })();
 
     this.inFlight = task;
@@ -151,5 +186,6 @@ export class ObserverManager {
 
   destroy(): void {
     this.stop();
+    this.evidence?.shutdown();
   }
 }

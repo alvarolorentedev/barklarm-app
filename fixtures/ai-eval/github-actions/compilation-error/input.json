@@ -1,0 +1,55 @@
+{
+  "synthetic": true,
+  "category": "compilation-error",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-compilation-error",
+    "type": "githubAction",
+    "alias": "Typecheck",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "typecheck.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "5004:1",
+    "link": "https://github.com/acme/api/actions/runs/5004"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 5004,
+      "run_attempt": 1,
+      "name": "Typecheck",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "feature/checkout-total",
+      "head_sha": "77aa901",
+      "event": "pull_request",
+      "created_at": "2026-01-15T13:00:00Z",
+      "run_started_at": "2026-01-15T13:00:05Z",
+      "updated_at": "2026-01-15T13:01:00Z",
+      "html_url": "https://github.com/acme/api/actions/runs/5004",
+      "repository": { "full_name": "acme/api" }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 6004,
+          "name": "typecheck",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/5004/job/6004",
+          "started_at": "2026-01-15T13:00:10Z",
+          "completed_at": "2026-01-15T13:00:50Z",
+          "steps": [
+            { "number": 1, "name": "checkout", "conclusion": "success", "started_at": "2026-01-15T13:00:11Z" },
+            { "number": 2, "name": "tsc --noEmit", "conclusion": "failure", "started_at": "2026-01-15T13:00:20Z" }
+          ]
+        }
+      ]
+    },
+    "logs": {
+      "6004": "2026-01-15T13:00:20.0000000Z tsc --noEmit\n2026-01-15T13:00:21.0000000Z src/checkout.ts(42,7): error TS2322: Type 'string' is not assignable to type 'number'.\n2026-01-15T13:00:22.0000000Z Process completed with exit code 2."
+    }
+  }
+}

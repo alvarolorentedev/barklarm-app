@@ -1,0 +1,18 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": ["execution", "job:6002", "step:6002:2", "error:6002:0"],
+  "requiredCategories": ["execution", "job", "step", "error"],
+  "limitations": [],
+  "forbiddenStrings": ["ghp_SYNTHETICCONFIGTOKEN1234567890"],
+  "requiredStrings": ["DATABASE_URL", "Missing required environment variable"],
+  "knownLimitations": ["The log states the variable is missing; it does not prove why the secret is absent."],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "The deploy job could not find the DATABASE_URL environment variable.",
+      "The workflow needs DATABASE_URL configured for the deploy step."
+    ],
+    "forbiddenClaims": ["The database server is down.", "The application code has a bug."],
+    "evidenceSufficiency": "sufficient",
+    "notes": "A future model must cite error:6002:0 and avoid claiming the database is unreachable."
+  }
+}

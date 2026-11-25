@@ -1,0 +1,18 @@
+{
+  "completeness": "complete",
+  "requiredEvidence": ["execution", "job:6001", "step:6001:2", "error:6001:0"],
+  "requiredCategories": ["execution", "job", "step", "error"],
+  "limitations": [],
+  "forbiddenStrings": ["ghp_SYNTHETICCONFIGTOKEN1234567890"],
+  "requiredStrings": ["AssertionError", "assert 3 == 4"],
+  "knownLimitations": ["The extractor is heuristic and does not prove the root cause."],
+  "futureRubric": {
+    "acceptableDiagnoses": [
+      "A test assertion failed in tests/test_math.py::test_add with expected 4 and actual 3.",
+      "The pytest job failed because an assertion did not hold."
+    ],
+    "forbiddenClaims": ["The production database is down.", "The commit author caused the failure."],
+    "evidenceSufficiency": "sufficient",
+    "notes": "The log contains an explicit FAILED test and assertion; a future model should cite error:6001:0."
+  }
+}

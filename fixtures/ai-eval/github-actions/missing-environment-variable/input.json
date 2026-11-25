@@ -1,0 +1,55 @@
+{
+  "synthetic": true,
+  "category": "missing-environment-variable",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-missing-env",
+    "type": "githubAction",
+    "alias": "Deploy",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "deploy.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "5002:1",
+    "link": "https://github.com/acme/api/actions/runs/5002"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 5002,
+      "run_attempt": 1,
+      "name": "Deploy",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "main",
+      "head_sha": "9ab77ef",
+      "event": "workflow_dispatch",
+      "created_at": "2026-01-15T11:00:00Z",
+      "run_started_at": "2026-01-15T11:00:05Z",
+      "updated_at": "2026-01-15T11:01:00Z",
+      "html_url": "https://github.com/acme/api/actions/runs/5002",
+      "repository": { "full_name": "acme/api" }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 6002,
+          "name": "deploy",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/5002/job/6002",
+          "started_at": "2026-01-15T11:00:10Z",
+          "completed_at": "2026-01-15T11:00:50Z",
+          "steps": [
+            { "number": 1, "name": "checkout", "conclusion": "success", "started_at": "2026-01-15T11:00:11Z" },
+            { "number": 2, "name": "Deploy", "conclusion": "failure", "started_at": "2026-01-15T11:00:20Z" }
+          ]
+        }
+      ]
+    },
+    "logs": {
+      "6002": "2026-01-15T11:00:20.0000000Z Starting deploy\n2026-01-15T11:00:21.0000000Z Error: Missing required environment variable DATABASE_URL\n2026-01-15T11:00:21.1000000Z Process completed with exit code 1."
+    }
+  }
+}

@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Status } from '../types/Status';
 import { Observer } from '../types/Observer';
 import { State } from '../types/State';
+import { EvidenceManager } from './diagnostics/evidence-manager';
+import { DIAGNOSTIC_LIMITS } from './diagnostics/limits';
 import { ObserverManager } from './observer-manager';
 
 function observer(state: State): Observer {
@@ -16,10 +18,10 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-function createManager(factory: (config: any) => Promise<Observer | undefined>) {
+function createManager(factory: (config: any) => Promise<Observer | undefined>, evidence?: any) {
   const presenter = { updateImage: vi.fn(), updateMenu: vi.fn() };
   const notifications = { updateNotifications: vi.fn() };
-  const manager = new ObserverManager(presenter, notifications as any, factory);
+  const manager = new ObserverManager(presenter, notifications as any, factory, evidence);
   return { manager, presenter, notifications };
 }
 
@@ -164,5 +166,71 @@ describe('ObserverManager', () => {
     expect(presenter.updateMenu).toHaveBeenLastCalledWith([
       expect.objectContaining({ id: 'new', status: Status.SUCCESS }),
     ]);
+  });
+
+  it('wires diagnostics without waiting for collection', async () => {
+    const evidence = { setObservers: vi.fn(), observe: vi.fn(), shutdown: vi.fn() };
+    const { manager, presenter } = createManager(
+      async () => observer({ name: 'build', status: Status.FAILURE, link: '' }),
+      evidence
+    );
+
+    await manager.refreshObservers([{ id: 'build', type: 'build' }]);
+
+    expect(evidence.setObservers).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'build', config: expect.objectContaining({ id: 'build' }) }),
+    ]);
+    expect(evidence.observe).toHaveBeenCalledWith([expect.objectContaining({ id: 'build', status: Status.FAILURE })]);
+    expect(presenter.updateMenu).toHaveBeenCalled();
+
+    manager.destroy();
+    expect(evidence.shutdown).toHaveBeenCalled();
+  });
+
+  it('does not let a broken diagnostic capability stop monitoring', async () => {
+    const { manager, presenter } = createManager(async () => {
+      const broken = observer({ name: 'build', status: Status.SUCCESS, link: '' });
+      broken.getDiagnosticProvider = () => {
+        throw new Error('broken provider');
+      };
+      return broken;
+    });
+
+    await manager.refreshObservers([{ id: 'build', type: 'build' }]);
+
+    expect(presenter.updateMenu).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'build', status: Status.SUCCESS }),
+    ]);
+  });
+
+  it('does not wait for a hanging diagnostic collection', async () => {
+    const hanging = new Promise<never>(() => undefined);
+    const evidence = new EvidenceManager({
+      enabled: true,
+      limits: { ...DIAGNOSTIC_LIMITS, collectionTimeoutMs: 60_000 },
+    });
+    const { manager, presenter } = createManager(async () => {
+      const failing = observer({
+        name: 'build',
+        status: Status.FAILURE,
+        link: 'https://example.test/run/1',
+        error: { id: '1:1', description: 'failed' },
+      });
+      failing.getDiagnosticScope = () => 'github.com/acme/api/ci.yml';
+      failing.getDiagnosticProvider = () => ({
+        sourceType: 'githubAction',
+        collectEvidence: () => hanging,
+      });
+      return failing;
+    }, evidence);
+
+    await manager.refreshObservers([{ id: 'build', type: 'build' }]);
+
+    expect(presenter.updateMenu).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'build', status: Status.FAILURE }),
+    ]);
+
+    manager.destroy();
+    await evidence.waitForIdle();
   });
 });

@@ -1,0 +1,55 @@
+{
+  "synthetic": true,
+  "category": "secret-exposure",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-secret-exposure",
+    "type": "githubAction",
+    "alias": "Deploy",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "deploy.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "5006:1",
+    "link": "https://github.com/acme/api/actions/runs/5006"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 5006,
+      "run_attempt": 1,
+      "name": "Deploy",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "main",
+      "head_sha": "13f0aa7",
+      "event": "push",
+      "created_at": "2026-01-15T15:00:00Z",
+      "run_started_at": "2026-01-15T15:00:05Z",
+      "updated_at": "2026-01-15T15:01:00Z",
+      "html_url": "https://github.com/acme/api/actions/runs/5006",
+      "repository": { "full_name": "acme/api" }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 6006,
+          "name": "deploy",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/5006/job/6006",
+          "started_at": "2026-01-15T15:00:10Z",
+          "completed_at": "2026-01-15T15:00:50Z",
+          "steps": [
+            { "number": 1, "name": "checkout", "conclusion": "success", "started_at": "2026-01-15T15:00:11Z" },
+            { "number": 2, "name": "Deploy", "conclusion": "failure", "started_at": "2026-01-15T15:00:20Z" }
+          ]
+        }
+      ]
+    },
+    "logs": {
+      "6006": "2026-01-15T15:00:20.0000000Z Deploying with token ghp_SYNTHETICLOGTOKEN1234567890ABCD\n2026-01-15T15:00:20.1000000Z Authorization: Bearer ghp_SYNTHETICBEARERTOKEN1234567890\n2026-01-15T15:00:20.2000000Z DATABASE_PASSWORD=synthetic-password-value\n2026-01-15T15:00:20.3000000Z callback https://ci-user:synthetic-url-password@deploy.example.test/run\n2026-01-15T15:00:21.0000000Z Error: upstream returned 401 Unauthorized\n2026-01-15T15:00:22.0000000Z Process completed with exit code 1."
+    }
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "synthetic": true,
+  "category": "failed-tests",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-failed-tests",
+    "type": "githubAction",
+    "alias": "API build",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "ci.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "5001:1",
+    "link": "https://github.com/acme/api/actions/runs/5001"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 5001,
+      "run_attempt": 1,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "main",
+      "head_sha": "4f2c1ab",
+      "event": "push",
+      "created_at": "2026-01-15T10:00:00Z",
+      "run_started_at": "2026-01-15T10:00:05Z",
+      "updated_at": "2026-01-15T10:04:00Z",
+      "html_url": "https://github.com/acme/api/actions/runs/5001",
+      "repository": { "full_name": "acme/api" }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 6001,
+          "name": "test",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/5001/job/6001",
+          "started_at": "2026-01-15T10:00:10Z",
+          "completed_at": "2026-01-15T10:03:00Z",
+          "steps": [
+            { "number": 1, "name": "checkout", "conclusion": "success", "started_at": "2026-01-15T10:00:11Z" },
+            { "number": 2, "name": "Run tests", "conclusion": "failure", "started_at": "2026-01-15T10:01:00Z" }
+          ]
+        }
+      ]
+    },
+    "logs": {
+      "6001": "2026-01-15T10:01:00.1234567Z Run pytest\n2026-01-15T10:01:01.0000000Z ============================= test session starts =============================\n2026-01-15T10:01:02.0000000Z FAILED tests/test_math.py::test_add - AssertionError: assert 3 == 4\n2026-01-15T10:01:02.0000001Z E   assert 3 == 4\n2026-01-15T10:01:03.0000000Z Process completed with exit code 1."
+    }
+  }
+}
