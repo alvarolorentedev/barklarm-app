@@ -5,6 +5,7 @@ export type BarklarmConfig = {
   refreshInterval?: number;
   issueGlobalEndpoint?: string;
   sslDisabled?: boolean;
+  diagnosticsEnabled?: boolean;
   autostart?: boolean;
   autoupdate?: boolean;
 };
@@ -14,6 +15,8 @@ export const DEFAULT_CONFIG: BarklarmConfig = {
   refreshInterval: 60000,
   issueGlobalEndpoint: '',
   sslDisabled: false,
+  // Opt-in: existing installations must not retrieve extra data until asked.
+  diagnosticsEnabled: false,
   autostart: true,
   autoupdate: true,
 };

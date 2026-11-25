@@ -56,4 +56,10 @@ describe('config', () => {
     expect(normalizeConfig(null).observables).toEqual([]);
     expect(normalizeConfig({ observables: 'nope' }).observables).toEqual([]);
   });
+
+  it('keeps diagnostic collection opt-in for existing configurations', () => {
+    expect(DEFAULT_CONFIG.diagnosticsEnabled).toBe(false);
+    expect(normalizeConfig({}).diagnosticsEnabled).toBe(false);
+    expect(normalizeConfig({ diagnosticsEnabled: true }).diagnosticsEnabled).toBe(true);
+  });
 });
