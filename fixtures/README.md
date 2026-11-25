@@ -1,8 +1,8 @@
 # Evaluation fixtures
 
-This directory is reserved for sanitized fixtures used by future diagnostic/AI evaluations. The conventions and metrics
-are defined in [docs/engineering/AI_EVALUATION.md](../docs/engineering/AI_EVALUATION.md). No evaluation harness or model
-is implemented yet.
+This directory holds sanitized fixtures for diagnostic/AI evaluations. The conventions and metrics are defined in
+[docs/engineering/AI_EVALUATION.md](../docs/engineering/AI_EVALUATION.md). No model or evaluation harness is implemented
+yet; Phase 1 fixtures are executed deterministically in `bun run check`.
 
 ## Rules
 
@@ -18,11 +18,15 @@ is implemented yet.
 ```text
 fixtures/ai-eval/<category>/<case>/
   input.json      synthetic source payload, observer config, synthetic: true
-  expected.json   expected evidence IDs, forbidden strings, rubric metadata
-  README.md       what the case proves and why it is realistic
+  expected.json   expected completeness, evidence IDs, limitations, forbidden strings, rubric metadata
+  README.md       what the case proves, why it is realistic and known limitations
 ```
 
-Categories: `github-actions`, `failed-tests`, `missing-env`, `dependencies`, `compilation`, `operational-alerts`,
-`insufficient-evidence`, `prompt-injection`.
+Implemented category: `github-actions/` with `failed-tests`, `missing-environment-variable`, `dependency-failure`,
+`compilation-error`, `insufficient-evidence`, `secret-exposure` and `prompt-injection`.
+
+`src/extensions/github/diagnostics/fixtures.test.ts` runs the real provider and normalizer against `input.json`, then
+checks `expected.json`. `futureRubric` metadata stays separate from the observable evidence and is not used by standard
+CI.
 
 Do not add a fixture that only makes a future evaluation look successful. Fixtures exist to expose failures.

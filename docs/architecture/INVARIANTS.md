@@ -20,11 +20,13 @@ explicit approval.
 | 13  | Browser tests are deterministic: mock scenarios only, no arbitrary sleeps, fixed locale.                                                       | Playwright config and review                      |
 | 14  | Native-only behavior is validated by Rust checks and CI; it is never simulated into a false pass.                                              | CI `rust` job; release builds                     |
 | 15  | A behavior change updates the closest document; a boundary change adds an ADR.                                                                 | Pull request checklist                            |
+| 16  | Diagnostic collection is opt-in, non-blocking and bounded; it never changes operational status, notifications or outbound payloads.            | `evidence-manager` tests; Playwright scenarios     |
 
 ## State boundaries
 
 - **Operational status** (`Status` + `State`): what the user sees now.
-- **Diagnostic evidence** (proposed, Phase 1): sanitized source context used to explain a failure.
+- **Diagnostic evidence** (`src/types/Diagnostics.ts`): bounded, sanitized source context for a specific failure. It is
+  opt-in, in-memory and never enters `State` or the issue webhook.
 - **AI analysis** (proposed, Phase 2+): a separate, evaluation-tested output with citations and uncertainty.
 
 Do not merge these into one mutable object. Do not build incident management.
@@ -34,4 +36,5 @@ Do not merge these into one mutable object. Do not build incident management.
 - Configuration is user data and may contain credentials. Do not log, export implicitly, or transmit it.
 - Integration responses are untrusted input.
 - Issue endpoints are user-configured and receive only allowlisted fields.
+- Diagnostic evidence is untrusted, sanitized, bounded and memory-only. It is never persisted, exported or transmitted.
 - Mock data is synthetic and must never read or write real configuration paths.

@@ -47,13 +47,25 @@ Select a scenario with a query parameter:
 | `unavailable`       | Reached/misconfigured integrations (`NA`)           |
 | `multiple-failures` | Three simultaneous failures with distinct event IDs |
 | `persistence`       | Healthy config suited to edit/reload checks         |
+| `diagnostics-complete`    | Failed GitHub workflow with complete evidence                    |
+| `diagnostics-partial`     | Partial evidence with an inaccessible log and truncation         |
+| `diagnostics-unavailable` | Deleted/inaccessible workflow run with no usable evidence        |
+| `diagnostics-multiple`    | Two failed workflows with independent evidence                   |
+| `diagnostics-unsupported` | Failed Sentry observer, diagnostics enabled but unsupported      |
+| `diagnostics-disabled`    | Failed workflow while diagnostics are off; enabling reveals them |
+| `diagnostics-collecting`  | Collection in progress, then available                           |
+| `diagnostics-secrets`     | Synthetic credential-like content already shown as redacted      |
 
 Examples:
 
 ```text
 http://127.0.0.1:1420/?scenario=failed-builds
+http://127.0.0.1:1420/?scenario=diagnostics-complete&reset=1
 http://127.0.0.1:1420/?scenario=persistence&reset=1
 ```
+
+Diagnostic scenarios enable the opt-in setting in their seeded config, except `diagnostics-disabled`. Expand the failed
+observer row to inspect the evidence panel. None of these scenarios make network requests.
 
 - `reset=1` clears only that scenario's key and reseeds it.
 - Without `reset`, edits survive reloads.
@@ -62,6 +74,8 @@ http://127.0.0.1:1420/?scenario=persistence&reset=1
 - Mock states are derived from the stored observers, so adding, removing or renaming an observer is reflected
   deterministically.
 - Scenarios live in `src/mainview/runtime/mock.ts`; add one there and extend `src/mainview/runtime/mock.test.ts`.
+- Diagnostic evidence is collected by the desktop runtime only; the mock serves deterministic envelopes and never
+  imports Tauri or performs I/O.
 
 ### Production isolation
 

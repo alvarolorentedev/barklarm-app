@@ -8,7 +8,9 @@ compiles; it is complete when the relevant checks prove the required behavior.
 | Layer                     | Location                                     | Runs with                    |
 | ------------------------- | -------------------------------------------- | ---------------------------- |
 | Core unit                 | `src/core/*.test.ts`                         | Vitest + jsdom               |
+| Core diagnostics          | `src/core/diagnostics/*.test.ts`             | Vitest + jsdom               |
 | Extension observers       | `src/extensions/<name>/observer/*.test.ts`   | Vitest, mocked fetch adapter |
+| Extension diagnostics     | `src/extensions/github/diagnostics/*.test.ts`| Vitest, deterministic fetch  |
 | Extension components      | `src/extensions/<name>/component/*.test.tsx` | Testing Library              |
 | Mainview pages/components | `src/mainview/**/*.test.tsx`                 | Testing Library              |
 | Browser acceptance        | `e2e/*.spec.ts`                              | Playwright + mock runtime    |
@@ -29,7 +31,8 @@ Run a single file with `bunx vitest run src/core/observer-manager.test.ts`. Run 
 ## Coverage
 
 Verified baseline at Phase 0 completion: 80.3% lines/statements, 88.8% branches, 81.3% functions across `src/**` (core:
-95.5% lines/statements, 94.0% branches, 90.9% functions). Gates in `vitest.config.ts`:
+95.5% lines/statements, 94.0% branches, 90.9% functions). Phase 1 verified: 87.42% lines/statements, 87.43% branches,
+85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Gates in `vitest.config.ts`:
 
 - overall: 78% lines, statements and functions; 86% branches;
 - `src/core/**`: 90% lines, statements and functions; 85% branches.
@@ -51,8 +54,10 @@ Priority areas for new work:
 4. **Configuration persistence** — legacy ID migration, duplicate IDs, import/export compatibility.
 5. **Integration adapters** — success, non-OK responses, malformed payloads, missing fields.
 6. **Error handling** — thrown fetch, invalid JSON, unknown integration type.
-7. **Browser journeys** — startup, navigation, configuration edit, reload persistence, failure and unavailable
-   presentation.
+7. **Diagnostic evidence** — provider discovery, exact run attempt, jobs/steps, log extraction, sanitization,
+   truncation, redirects, rate limits, dedupe, retry, timeout, stale results, eviction and unsupported integrations.
+8. **Browser journeys** — startup, navigation, configuration edit, reload persistence, failure and unavailable
+   presentation, diagnostic settings and evidence states.
 
 ## Unit conventions
 
@@ -80,9 +85,13 @@ CI. Native checks require the platform webview packages listed in [DEVELOPMENT.m
 
 ## Fixtures
 
-Browser scenarios are synthetic, deterministic fixtures in `src/mainview/runtime/mock.ts`. Future diagnostic/AI fixtures
-follow [AI_EVALUATION.md](AI_EVALUATION.md) and must be sanitized. Never use real tokens, customer logs or personal data
-in a fixture, screenshot or trace.
+Browser scenarios are synthetic, deterministic fixtures in `src/mainview/runtime/mock.ts`. Seven diagnostic fixtures
+live under `fixtures/ai-eval/github-actions/` and are executed by
+`src/extensions/github/diagnostics/fixtures.test.ts`: the real provider and normalizer run against synthetic API
+responses, then assert required evidence IDs, categories, limitations, forbidden strings and completeness.
+
+Fixtures are sanitized and synthetic. Never use real tokens, customer logs or personal data in a fixture, screenshot or
+trace. The case `expected.json` keeps observable evidence separate from future AI rubric metadata.
 
 ## Honesty
 

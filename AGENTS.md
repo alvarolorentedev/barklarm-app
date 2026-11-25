@@ -6,9 +6,9 @@ Canonical entry point for coding agents. Read this first, then follow the links 
 ## Product purpose
 
 Barklarm is an MIT-licensed, local-first build and observability radiator for the menu bar. It watches CI pipelines,
-monitors and alert sources, reduces them to one glanceable status, and explains where to look next. The product is
-moving toward evidence-based, local diagnosis; **no AI inference is implemented yet**. Do not add AI features, cloud
-services or a backend unless an approved task says so.
+monitors and alert sources, reduces them to one glanceable status, and explains where to look next. Phase 1 adds opt-in,
+bounded diagnostic evidence for supported failures; **no AI inference is implemented yet**. Do not add AI features,
+cloud services or a backend unless an approved task says so.
 
 ## Read order
 
@@ -56,7 +56,7 @@ also require the Rust commands. Never weaken a check to make it pass.
 
 ```text
 src/core/              Application behavior: config, observer orchestration, notifications, payloads
-src/extensions/<name>/ One integration: type, observer (I/O), component (form fields), tests
+src/extensions/<name>/ One integration: type, observer (I/O), optional diagnostics provider, component, tests
 src/mainview/          React presentation, pages, contexts, desktop shell and runtime facade
 src/mainview/runtime/  Browser mock runtime and shared client contract
 src/mainview/desktop/  Tauri-only shell: tray, dialogs, notifications, autostart, store bridge
@@ -85,7 +85,9 @@ Full list and enforcement: [docs/architecture/INVARIANTS.md](docs/architecture/I
 
 Use `bun run dev:mock` and select a scenario with `?scenario=<name>`:
 
-`empty`, `healthy`, `failed-builds`, `running-builds`, `unavailable`, `multiple-failures`, `persistence`.
+`empty`, `healthy`, `failed-builds`, `running-builds`, `unavailable`, `multiple-failures`, `persistence`,
+`diagnostics-complete`, `diagnostics-partial`, `diagnostics-unavailable`, `diagnostics-multiple`,
+`diagnostics-unsupported`, `diagnostics-disabled`, `diagnostics-collecting`, `diagnostics-secrets`.
 
 - `?scenario=persistence&reset=1` reseeds that scenario; omit `reset` to keep edits across reloads.
 - Mock configuration is stored in `localStorage` under `barklarm.mock.v1.<scenario>` only.
@@ -97,8 +99,8 @@ Scenario details and browser automation guidance: [docs/engineering/DEVELOPMENT.
 ## Testing requirements
 
 - New logic needs a focused unit test; bug fixes need a regression test that fails before the fix.
-- Observer lifecycle, state transitions, notification behavior, persistence and integration adapters are the
-  highest-value test areas.
+- Observer lifecycle, state transitions, notification behavior, persistence, integration adapters and diagnostic
+  evidence collection are the highest-value test areas.
 - Browser tests must be deterministic: no arbitrary sleeps, fixed locale (`en-US`), mock scenarios only.
 - Playwright keeps traces and screenshots on failure in `test-results/`.
 - Coverage gates: 78% lines/statements/functions and 86% branches overall; `src/core/**` must stay at 90%
@@ -108,7 +110,9 @@ Scenario details and browser automation guidance: [docs/engineering/DEVELOPMENT.
 ## Security requirements
 
 - Never log or commit credentials, tokens, personal data or real configuration.
-- Treat integration responses and future diagnostic evidence as untrusted data.
+- Treat integration responses and diagnostic evidence as untrusted data; render it as text, never execute it.
+- Diagnostic collection is opt-in, memory-only and bounded. Sanitize before caching; never add evidence to `State` or
+  the issue webhook.
 - External transmissions use explicit allowlists (`buildIssuePayload`); do not send new fields by default.
 - Configuration changes must stay backward compatible. Legacy configs are migrated on load; preserve import/export
   compatibility.

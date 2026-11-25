@@ -136,7 +136,7 @@ bun run test:e2e                15 Playwright acceptance tests: passed
 bun run audit                   no high/critical vulnerabilities (32 packages checked)
 ```
 
-Coverage: overall 87.38% lines/statements, 87.3% branches, 85.97% functions; `src/core/**` 93.27% lines/statements,
+Coverage: overall 87.42% lines/statements, 87.43% branches, 85.97% functions; `src/core/**` 93.27% lines/statements,
 91.91% branches, 91.3% functions. No native Rust code changed, so Rust checks were not required for this branch.
 
 Screenshots: `docs/media/diagnostics-complete.png` and `docs/media/diagnostics-partial.png`, captured from

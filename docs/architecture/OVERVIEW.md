@@ -1,7 +1,7 @@
 # Architecture overview
 
-Status: implemented behavior of Barklarm 3.x. Proposed future capabilities are labelled below and are not part of the
-current code.
+Status: implemented behavior of Barklarm 3.x plus Phase 1 diagnostic evidence. Proposed future capabilities are
+labelled below and are not part of the current code.
 
 ## Runtime shapes
 
@@ -13,12 +13,13 @@ Native (bun run dev / packaged app)
                           -> NotificationManager -> Tauri notification plugin
                           -> TrayPresenter -> Tauri tray/menu APIs
                           -> Tauri invoke -> src-tauri/src/store.rs -> config.json
+       -> desktop/client -> EvidenceManager -> extensions/<name>/diagnostics -> fetch-adapter -> Tauri HTTP
   StrictMode + HashRouter; tray remains the primary surface when the window is closed.
 
 Browser mock (bun run dev:mock)
   React (same components and pages)
     -> rpc-client facade
-       -> runtime/mock -> deterministic scenario states + namespaced localStorage
+       -> runtime/mock -> deterministic scenario states, evidence and namespaced localStorage
   No Tauri imports, network calls, credentials or real user configuration.
 ```
 
@@ -30,9 +31,11 @@ contains a separate `client.js` chunk but no mock code.
 
 | Layer                             | Owns                                                                             | Must not own                          |
 | --------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------- |
-| `src/extensions/<name>/observer`  | Source-specific I/O and status/evidence extraction                               | Persistence, notifications, rendering |
+| `src/extensions/<name>/observer`  | Source-specific I/O and status extraction                                        | Persistence, notifications, rendering |
+| `src/extensions/<name>/diagnostics` | Optional source-specific evidence provider and extraction                     | Cache, lifecycle, sanitization policy |
 | `src/extensions/<name>/component` | Configuration form fields                                                        | Network calls, app state              |
-| `src/core`                        | Identity, config normalization, orchestration, notifications, payload allowlists | React, Tauri, DOM                     |
+| `src/core`                        | Identity, config normalization, orchestration, notifications, evidence lifecycle, sanitization, payload allowlists | React, Tauri, DOM |
+| `src/core/diagnostics`            | Evidence manager, limits, sanitization and normalization                         | Source API details                    |
 | `src/mainview`                    | Presentation, interaction, contexts, desktop shell                               | Source-specific fetch logic           |
 | `src/mainview/runtime`            | Shared RPC contract and deterministic browser mock                               | Tauri imports, real config            |
 | `src/mainview/desktop`            | Tray, dialogs, notifications, autostart, Tauri bridge                            | Core policy decisions                 |
@@ -69,10 +72,22 @@ New integrations follow that shape; they do not add switches to core.
 
 `State` is the presentation contract: `id`, `name`, `status` (`SUCCESS`, `FAILURE`, `CHECKING`, `NA`), `link`, optional
 `muted`, `issueEndpoint`, and optional `error.id` / `error.description` / `error.actions`. Source-specific failure IDs
-already exist for every integration and drive distinct failure notifications.
+already exist for every integration and drive distinct failure notifications. GitHub IDs include the run attempt.
 
-Proposed, not implemented: a separate evidence envelope for diagnostic context, and local analysis output with citations
-and uncertainty. Do not add those fields to `State` or to the webhook by default.
+## Diagnostic evidence (Phase 1)
+
+- An observer may expose a `DiagnosticProvider` and a source scope. The provider owns API calls and credentials; it
+  returns a bounded draft. Missing providers report `unsupported`.
+- `EvidenceManager` schedules collection after a refresh publishes states, never inside the polling cycle. It keys
+  evidence by `observerId + diagnosticScope + failureId`, deduplicates concurrent work, retries transient failures once,
+  and cancels on configuration change, removal, resolution or shutdown.
+- Evidence is in-memory only: 25 failures, 30-minute TTL, 40 items, 20,000 characters and 4,000 characters per item.
+- `normalizeEvidence` strips control sequences, redacts recognizable credentials and enforces size limits before the
+  runtime exposes the envelope. Evidence content is untrusted data rendered as text.
+- The UI shows a Diagnostic evidence panel inside an expanded failed observer. The setting is opt-in and defaults to
+  off. The webhook, tray, notifications and operational status are unchanged.
+- Local analysis with citations and uncertainty is still proposed (Phase 2), not implemented. Do not add it to `State`
+  or the webhook.
 
 ## Build and test surfaces
 

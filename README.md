@@ -43,6 +43,10 @@
 
 **Native, local, yours.** A Tauri app with a Rust shell and a TypeScript core. Your configuration stays on your machine. No account, no server, no notification plumbing to build.
 
+**Know what failed, not just that it failed.** Opt in to diagnostic evidence for supported failures and inspect failed
+GitHub Actions jobs, steps and bounded error excerpts without leaving Barklarm. Evidence is sanitized, kept in memory
+and never sent to an AI service.
+
 ## How it works
 
 1. **Add your sources.** Pick an integration or drop in a link. Set an alias so `api — production` reads like a human wrote it.
@@ -69,13 +73,19 @@ CCTray support covers any server that exposes a `cc.xml` feed, so tools like Jen
 </p>
 
 <details>
-  <summary><strong>More screenshots</strong> — configuration and settings</summary>
+  <summary><strong>More screenshots</strong> — configuration, diagnostics and settings</summary>
   <br />
   <p align="center">
     <img src="docs/media/observers-config.png" alt="Configuring a GitHub Actions observer in Barklarm" width="720" />
   </p>
   <p align="center">
     <img src="docs/media/general.png" alt="Barklarm general settings" width="720" />
+  </p>
+  <p align="center">
+    <img src="docs/media/diagnostics-complete.png" alt="Diagnostic evidence panel showing failed GitHub Actions jobs, steps and a sanitized error excerpt" width="860" />
+  </p>
+  <p align="center">
+    <img src="docs/media/diagnostics-partial.png" alt="Partial diagnostic evidence with limitations and access errors" width="860" />
   </p>
 </details>
 
@@ -136,7 +146,7 @@ bun run test:e2e   # Playwright acceptance tests against the mock runtime
 bun run build      # Tauri app and dmg, output in src-tauri/target/release/bundle/
 ```
 
-Browser development needs no credentials, native dependencies or external services. Mock scenarios are selected with `?scenario=empty|healthy|failed-builds|running-builds|unavailable|multiple-failures|persistence`.
+Browser development needs no credentials, native dependencies or external services. Mock scenarios are selected with `?scenario=empty|healthy|failed-builds|running-builds|unavailable|multiple-failures|persistence|diagnostics-complete|diagnostics-partial|diagnostics-unavailable|diagnostics-multiple|diagnostics-unsupported|diagnostics-disabled|diagnostics-collecting|diagnostics-secrets`.
 
 Development builds show the settings window immediately so the UI can be inspected. Production builds start in the tray.
 

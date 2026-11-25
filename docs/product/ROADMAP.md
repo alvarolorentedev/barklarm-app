@@ -2,7 +2,7 @@
 
 Status: directional, not a release commitment. Product scope changes require human approval.
 
-## Phase 0 — Agentic readiness (current)
+## Phase 0 — Agentic readiness (completed)
 
 Goal: make the repository safe and efficient for autonomous agents.
 
@@ -15,18 +15,20 @@ Goal: make the repository safe and efficient for autonomous agents.
 Exit criteria are recorded in the Phase 0 pull request and the repository definition of done in
 [../../AGENTS.md](../../AGENTS.md).
 
-## Phase 1 — Evidence model
+## Phase 1 — Evidence model (implemented)
 
 Goal: capture enough source-specific context to explain a failure without guesswork.
 
-- A typed, bounded evidence envelope separate from `State`.
-- Sanitized fixtures for workflow failures, test failures, missing env vars, dependency and compilation errors.
-- Retention and size limits; no secrets in evidence.
-- Notification and UI rules that stay compatible with 3.x behavior.
+- A typed, bounded evidence envelope separate from `State`; see
+  [spec 0001](../specs/0001-diagnostic-evidence-engine.md).
+- GitHub Actions collection for the exact run attempt: failed jobs, steps and bounded log excerpts.
+- Sanitization, memory-only retention, size limits and an opt-in setting, disabled by default.
+- Minimal Observers UI, desktop/mock runtime support and deterministic fixtures.
+- Notifications and the issue webhook remain compatible with 3.x; GitHub failure IDs now include the attempt.
 
-Not started. Requires an approved spec under [../specs/](../specs/).
+Phase 1 does not infer causes. It collects and presents trustworthy evidence.
 
-## Phase 2 — Local diagnosis
+## Phase 2 — Local diagnosis (next)
 
 Goal: explain a failure and recommend a next action using a local model.
 
@@ -35,7 +37,8 @@ Goal: explain a failure and recommend a next action using a local model.
 - Explicit uncertainty when evidence is insufficient.
 - Secret and prompt-injection resistance tests.
 
-Not started. No model vendor, download mechanism or runtime dependency is chosen.
+Phase 1 evidence, fixture IDs and completeness/limitations signals are the inputs. No model vendor, download mechanism
+or runtime dependency is chosen.
 
 ## Phase 3 — Evaluated assistance
 

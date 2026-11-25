@@ -8,6 +8,7 @@ what to do next — without sending your operational data to someone else's clou
 Barklarm 3.x is a native Tauri app. Observers poll CI and observability sources, reduce each source to a status, and
 keep the tray icon, menu and notifications in sync. Configuration and credentials stay on the machine. Ten integrations
 ship today: GitHub Actions, Azure DevOps, Bitbucket, CCTray, Datadog, Sentry, New Relic, Opsgenie, Grafana and Graylog.
+Phase 1 adds opt-in, bounded diagnostic evidence for GitHub Actions failures, still local and without inference.
 
 ## Direction
 
@@ -20,13 +21,18 @@ The radiator becomes a diagnostician:
    guessing.
 
 This direction is a product hypothesis, not a commitment to a model vendor, cloud service or agent framework. No
-inference, model download or cloud backend is implemented in Phase 0.
+inference, model download or cloud backend is implemented in Phase 1.
 
 ## Phase 0 scope
 
 Make the repository capable of sustained, autonomous engineering: reproducible installs, a browser-runnable mock
 application, deterministic scenarios, one quality command, browser acceptance tests, native checks, explicit boundaries
 and agent-ready documentation.
+
+## Phase 1 scope
+
+Collect and present bounded, sanitized evidence for supported failures, with deterministic fixtures for future
+evaluation. Evidence is opt-in and memory-only. No inference or model runtime is added.
 
 ## Non-goals
 

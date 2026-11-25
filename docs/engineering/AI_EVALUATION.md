@@ -1,7 +1,7 @@
 # AI evaluation strategy
 
-Status: conventions only. No model, prompt pipeline or inference is implemented, and no evaluation is run in standard
-CI.
+Status: Phase 1 fixtures and deterministic evidence checks are implemented. No model, prompt pipeline or inference is
+implemented, and no model evaluation is run in standard CI.
 
 Barklarm will eventually explain failures with local language models. That capability needs a different testing
 discipline from deterministic software.
@@ -24,7 +24,7 @@ and do not ship a diagnosis feature without recorded evaluation evidence.
 
 ## Fixture conventions
 
-Proposed location: `fixtures/ai-eval/<category>/<case>/`. Each case has:
+Implemented location: `fixtures/ai-eval/<category>/<case>/`. Each case has:
 
 ```text
 fixtures/ai-eval/github-actions/failed-workflow/
@@ -81,5 +81,23 @@ When an evaluation harness is approved:
 
 ## Current work
 
-Phase 0 establishes fixtures, sanitization expectations and the deterministic checks around future evidence. It does not
-add a model dependency, a prompt, an inference path or a claimed evaluation result.
+Phase 1 adds seven synthetic GitHub Actions cases:
+
+```text
+fixtures/ai-eval/github-actions/
+  failed-tests/
+  missing-environment-variable/
+  dependency-failure/
+  compilation-error/
+  insufficient-evidence/
+  secret-exposure/
+  prompt-injection/
+```
+
+`src/extensions/github/diagnostics/fixtures.test.ts` runs the real provider and normalizer against these inputs. It
+asserts completeness, required evidence IDs and categories, limitation codes, required content and forbidden strings.
+The prompt-injection case preserves adversarial text as data and asserts it is present in the envelope; Phase 1 does not
+claim model-level resistance. The `futureRubric` block is clearly separate from the observable evidence and is not used
+by standard CI.
+
+This work does not add a model dependency, a prompt, an inference path or a claimed evaluation result.

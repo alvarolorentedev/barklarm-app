@@ -9,7 +9,7 @@ via [../../SECURITY.md](../../SECURITY.md), not a public issue.
 - Source operational data: build logs, deploy status, alert metadata, links.
 - The local config file and explicit exports.
 - The user's machine, through native capabilities and arbitrary HTTP(S) access.
-- Future diagnostic evidence and model prompts.
+- Diagnostic evidence and future model prompts.
 
 ## Trust boundaries
 
@@ -41,6 +41,28 @@ rejected.
 Actions embedded in a source response are treated as untrusted data. They are forwarded as data today; review any future
 execution or rendering carefully.
 
+## Diagnostic evidence
+
+Diagnostic collection is opt-in and disabled by default. When enabled, supported integrations may retrieve additional
+operational data for the exact failed event while the app is running.
+
+- Collected: execution metadata, failed jobs and steps, bounded log excerpts, error signals, completeness and source
+  links. Not collected: full raw logs, workflow archives, actor identity, email, unrelated jobs or runner hostnames.
+- Evidence is memory-only: 25 failures, 30-minute TTL, 40 items, 20,000 characters per envelope and 4,000 per item. It is
+  never written to disk, exported, added to `State`, sent to the issue webhook or transmitted to telemetry.
+- The normalizer strips ANSI/C0/C1 and bidi/zero-width control sequences and redacts recognizable authorization headers,
+  bearer values, GitHub tokens, API-key/password assignments, URL credentials, private keys, JWTs and selected cloud
+  keys. Configured credential values are removed exactly when their key name marks them as secrets.
+- GitHub API requests use `maxRedirections: 0`. Job-log redirects are followed manually only over HTTPS, only to
+  `*.blob.core.windows.net`, `*.githubusercontent.com` or `github.com`, never with the Authorization header, and never
+  with URL credentials or non-standard ports. Unexpected redirects become `redirect_rejected` evidence.
+- Evidence is untrusted data: it is rendered as text, never HTML; commands in logs are never executed; external links
+  must be HTTP(S). Provider responses are size-bounded while reading.
+- GitHub failure identity is `<run_id>:<run_attempt>`, so a rerun cannot reuse another attempt's evidence.
+
+Pattern-based redaction is a safety net, not a proof. Encoded, split, transformed or unrecognized secrets may survive.
+Redaction also changes evidence, so the envelope reports `content_redacted` and downgrades completeness to `partial`.
+
 ## SSL verification
 
 `sslDisabled` is opt-in, clearly labeled in settings and only affects the Tauri HTTP client. It enables accepting
@@ -64,6 +86,8 @@ personal data in a test, trace or screenshot. CI requires no secrets for validat
 | Dev-only tinypool, simple-git and other build-tool advisories        | Low for shipped app | Accepted while on the current toolchain; the dev server binds `127.0.0.1`. Revisit during the next tooling upgrade. |
 | Board builds are unsigned/not notarized                              | Operational         | Release workflow does not configure signing. Users may see OS warnings. Requires human credentials to change.       |
 | Issue webhook payload compatibility                                  | Informational       | Keep the allowlist field-compatible; document intentional changes.                                                  |
+| Diagnostic redaction cannot prove every secret is removed            | Medium              | Accepted for Phase 1. Recognizable patterns and configured credentials are removed; encoded/unknown secrets may survive. |
+| Diagnostic log redirect host allowlist may need maintenance          | Low                 | Accepted. Unexpected hosts are rejected as partial evidence; no credentials are forwarded.                           |
 
 Do not silently remove functionality or break configuration compatibility to resolve a finding. Record the decision and
 test the migration.
@@ -83,4 +107,6 @@ test the migration.
 - [ ] Logs, tests, fixtures and traces contain no secrets or personal data.
 - [ ] Configuration remains backward compatible and migration is tested.
 - [ ] Mock code cannot reach real configuration or a production bundle.
+- [ ] Diagnostic evidence is opt-in, bounded, sanitized, memory-only and absent from outbound payloads.
+- [ ] Log redirects and external links cannot carry credentials or execute remote content.
 - [ ] New native permission is least-privilege and documented.
