@@ -29,6 +29,7 @@ export class ObserverManager {
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private inFlight: Promise<void> | null = null;
   private generation = 0;
+  private configBuilds = 0;
 
   constructor(
     private readonly presenter: ObserverPresenter,
@@ -45,21 +46,29 @@ export class ObserverManager {
 
   async setConfigs(configs: ObserverConfiguration[]): Promise<void> {
     const generation = ++this.generation;
-    const normalized = normalizeObservables(configs);
-    const entries = await Promise.all(
-      normalized.map(async (config) => {
-        try {
-          const observer = await this.factory(config);
-          return observer ? { config, observer } : undefined;
-        } catch (error) {
-          console.error(error);
-          return undefined;
-        }
-      })
-    );
-    // A newer configuration was applied while observers were being built.
-    if (generation !== this.generation) return;
-    this.entries = entries.filter(Boolean) as ObserverEntry[];
+    this.configBuilds += 1;
+    try {
+      const normalized = normalizeObservables(configs);
+      const entries = await Promise.all(
+        normalized.map(async (config) => {
+          try {
+            const observer = await this.factory(config);
+            return observer ? { config, observer } : undefined;
+          } catch (error) {
+            console.error(error);
+            return undefined;
+          }
+        })
+      );
+      // A newer configuration was applied while observers were being built.
+      if (generation !== this.generation) return;
+      this.entries = entries.filter(Boolean) as ObserverEntry[];
+      // Invalidate refreshes that started with the previous entries while the
+      // replacement observers were still being built.
+      this.generation += 1;
+    } finally {
+      this.configBuilds -= 1;
+    }
   }
 
   async refreshObservers(configs: ObserverConfiguration[]): Promise<void> {
@@ -75,6 +84,7 @@ export class ObserverManager {
    */
   refreshState(): Promise<void> {
     if (this.inFlight) return this.inFlight;
+    if (this.configBuilds > 0) return Promise.resolve();
     return this.runRefresh();
   }
 

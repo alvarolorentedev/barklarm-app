@@ -119,6 +119,31 @@ describe('ObserverManager', () => {
     vi.useRealTimers();
   });
 
+  it('does not refresh while replacement observers are being built', async () => {
+    const oldGate = deferred<State>();
+    const rebuild = deferred<Observer>();
+    const factory = vi.fn(async (config: any) => {
+      if (config.type === 'new') return rebuild.promise;
+      return { getState: () => oldGate.promise } as Observer;
+    });
+    const { manager, presenter } = createManager(factory);
+
+    await manager.setConfigs([{ id: 'old', type: 'old' }]);
+    const configChange = manager.refreshObservers([{ id: 'new', type: 'new' }]);
+    const interimRefresh = manager.refreshState();
+
+    rebuild.resolve(observer({ name: 'new', status: Status.SUCCESS, link: '' }));
+    oldGate.resolve({ name: 'old', status: Status.FAILURE, link: '' });
+
+    await interimRefresh;
+    await configChange;
+
+    expect(presenter.updateMenu).not.toHaveBeenCalledWith([expect.objectContaining({ id: 'old' })]);
+    expect(presenter.updateMenu).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'new', status: Status.SUCCESS }),
+    ]);
+  });
+
   it('discards results from a configuration that changed mid-refresh', async () => {
     const oldGate = deferred<State>();
     const factory = vi.fn(async (config: any) => {
