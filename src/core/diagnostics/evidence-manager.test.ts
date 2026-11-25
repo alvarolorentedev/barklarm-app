@@ -113,17 +113,49 @@ describe('EvidenceManager', () => {
   });
 
   it('discards a result for a failure that resolved during collection', async () => {
-    const gate = deferred<EvidenceDraft>();
-    const provider = providerFor(() => gate.promise);
+    const stale = deferred<EvidenceDraft>();
+    const fresh = deferred<EvidenceDraft>();
+    const provider = providerFor(
+      vi
+        .fn()
+        .mockImplementationOnce(() => stale.promise)
+        .mockImplementationOnce(() => fresh.promise)
+    );
     const manager = new EvidenceManager({ enabled: true, limits });
     manager.setObservers([source('a', provider)]);
 
     manager.observe([failure('a', '1:1')]);
     manager.observe([success('a')]);
-    gate.resolve(draft('stale'));
+    stale.resolve(draft('stale'));
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('a')).toEqual({ status: 'not_collected' });
+
+    // A new observation must start a fresh collection; the discarded draft must
+    // not satisfy it from a hidden cache.
+    manager.observe([failure('a', '1:1')]);
+    fresh.resolve(draft('fresh'));
     await manager.waitForIdle();
 
+    expect(provider.collectEvidence).toHaveBeenCalledTimes(2);
+    expect(manager.getSnapshot('a').evidence?.summary).toBe('fresh');
+  });
+
+  it('keeps evidence while a source is temporarily unavailable or checking', async () => {
+    const provider = providerFor(async () => draft());
+    const manager = new EvidenceManager({ enabled: true, limits });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+
+    manager.observe([{ id: 'a', name: 'a', status: Status.NA, link: '' }]);
+    expect(manager.getSnapshot('a').status).toBe('available');
+
+    manager.observe([{ id: 'a', name: 'a', status: Status.CHECKING, link: '' }]);
+    expect(manager.getSnapshot('a').status).toBe('available');
+
+    manager.observe([success('a')]);
     expect(manager.getSnapshot('a')).toEqual({ status: 'not_collected' });
+    expect(provider.collectEvidence).toHaveBeenCalledTimes(1);
   });
 
   it('discards a result after the diagnostic scope changes', async () => {
@@ -209,14 +241,9 @@ describe('EvidenceManager', () => {
     expect(implementation).toHaveBeenCalledTimes(2);
   });
 
-  it('times out a provider that ignores cancellation', async () => {
+  it('times out a provider that never settles and ignores cancellation', async () => {
     vi.useFakeTimers();
-    const provider = providerFor(
-      (_failure, options) =>
-        new Promise((_resolve, reject) => {
-          options.signal.addEventListener('abort', () => reject(new Error('aborted')));
-        })
-    );
+    const provider = providerFor(() => new Promise<EvidenceDraft>(() => undefined));
     const manager = new EvidenceManager({ enabled: true, limits });
     manager.setObservers([source('a', provider)]);
     manager.observe([failure('a', '1:1')]);
@@ -225,6 +252,22 @@ describe('EvidenceManager', () => {
     await manager.waitForIdle();
 
     expect(manager.getSnapshot('a')).toEqual({ status: 'failed' });
+  });
+
+  it('discards an in-flight result when diagnostics are disabled', async () => {
+    const gate = deferred<EvidenceDraft>();
+    const provider = providerFor(() => gate.promise);
+    const manager = new EvidenceManager({ enabled: true, limits });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    expect(manager.getSnapshot('a').status).toBe('collecting');
+
+    manager.setEnabled(false);
+    expect(manager.getSnapshot('a')).toEqual({ status: 'disabled' });
+
+    gate.resolve(draft('stale'));
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('a')).toEqual({ status: 'disabled' });
   });
 
   it('bounds concurrent collection work', async () => {
@@ -310,6 +353,11 @@ describe('EvidenceManager', () => {
 
     const available = ['a', 'b', 'c'].filter((id) => manager.getSnapshot(id).status === 'available');
     expect(available).toHaveLength(1);
+
+    const calls = vi.mocked(provider.collectEvidence).mock.calls.length;
+    manager.observe([failure('a', '1'), failure('b', '2'), failure('c', '3')]);
+    await manager.waitForIdle();
+    expect(vi.mocked(provider.collectEvidence).mock.calls.length).toBe(calls);
   });
 
   it('redacts configured credentials before caching', async () => {
@@ -396,6 +444,19 @@ describe('EvidenceManager', () => {
     clock += limits.cacheTtlMs + 1;
     expect(manager.getSnapshot('a')).toEqual({ status: 'not_collected' });
     expect(provider.collectEvidence).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards an in-flight result on shutdown', async () => {
+    const gate = deferred<EvidenceDraft>();
+    const provider = providerFor(() => gate.promise);
+    const manager = new EvidenceManager({ enabled: true, limits });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    manager.shutdown();
+
+    gate.resolve(draft('stale'));
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('a')).toEqual({ status: 'disabled' });
   });
 
   it('clears evidence on shutdown', async () => {

@@ -54,6 +54,7 @@ export function sanitizeText(value: string, knownSecrets: string[] = []): Saniti
   }
 
   apply(/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g, '[REDACTED PRIVATE KEY]');
+  apply(/(["']?authorization["']?\s*[:=]\s*)(["'])[^\n]*?\2/gi, `$1$2${REDACTED}$2`);
   apply(/(authorization\s*[:=]\s*)(?:bearer|basic|token)?\s*[^\s,;]+/gi, `$1${REDACTED}`);
   apply(/(proxy-authorization\s*[:=]\s*)[^\s,;]+/gi, `$1${REDACTED}`);
   apply(/(x-api-key\s*:\s*)[^\s,;]+/gi, `$1${REDACTED}`);
@@ -64,6 +65,10 @@ export function sanitizeText(value: string, knownSecrets: string[] = []): Saniti
   apply(/\bsk-(?:ant-)?[A-Za-z0-9_-]{20,}\b/g, REDACTED);
   apply(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, REDACTED);
   apply(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, `$1${REDACTED}@`);
+  apply(
+    /(["']?[A-Za-z0-9_.-]{0,64}(?:token|secret|password|passwd|api[_-]?key|app[_-]?key|auth[_-]?key|access[_-]?key)[A-Za-z0-9_.-]{0,64}["']?\s*[:=]\s*)(["'])[^\n]*?\2/gi,
+    `$1$2${REDACTED}$2`
+  );
   apply(
     /\b([A-Za-z0-9_.-]{0,64}(?:token|secret|password|passwd|api[_-]?key|app[_-]?key|auth[_-]?key|access[_-]?key)[A-Za-z0-9_.-]{0,64})\s*[:=]\s*["']([^"']{4,})["']/gi,
     `$1=${REDACTED}`

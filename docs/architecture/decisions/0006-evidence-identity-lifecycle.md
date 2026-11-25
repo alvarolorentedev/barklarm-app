@@ -20,8 +20,9 @@ The evidence key is `observerId + diagnosticScope + failureId`.
 
 The manager keeps one current failure per observer. It collects on every observed failed state (covering startup and
 observers that remain red), deduplicates by key, aborts superseded work and accepts a result only if the key is still the
-current failure. Resolution, observer removal, configuration scope change, timeout, disable and shutdown abort or discard
-pending work.
+current failure. A SUCCESS status clears evidence; NA/CHECKING are unknown/temporary and retain the last failure until a
+real resolution or a new failure. Scope change, observer removal, timeout, disable and shutdown abort or discard pending
+work. A seen marker survives cache eviction so an evicted failure is not re-collected on every poll.
 
 ## Consequences
 

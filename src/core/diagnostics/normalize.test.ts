@@ -220,6 +220,33 @@ describe('normalizeEvidence', () => {
     expect(evidence.items[1].truncation).toBeUndefined();
   });
 
+  it('sanitizes truncation reasons and caps source URLs', () => {
+    const evidence = normalize(
+      draft({
+        items: [
+          {
+            id: 'log:1',
+            category: 'log',
+            title: 'Log',
+            content: 'x',
+            truncation: { truncated: true, originalLength: 10, returnedLength: 5, reason: '<script>' },
+          },
+          {
+            id: 'log:2',
+            category: 'log',
+            title: 'Log 2',
+            content: 'x',
+            source: { url: `https://example.test/${'a'.repeat(2100)}` },
+          },
+        ],
+      })
+    );
+
+    expect(evidence.items[0].truncation?.reason).toBe('unknown');
+    expect(evidence.items[1].source).toBeUndefined();
+    expect(evidence.limitations).toContain('invalid_source_url');
+  });
+
   it('truncates to the remaining envelope size instead of only dropping items', () => {
     const evidence = normalizeEvidence(
       draft({

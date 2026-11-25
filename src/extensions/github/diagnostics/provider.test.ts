@@ -247,6 +247,41 @@ describe('GithubDiagnosticProvider', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps page-one jobs when a later page fails', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/attempts/2')) return response(200, run());
+      if (url.includes('&page=1')) return response(200, { total_count: 2, jobs: [failedJob] });
+      if (url.includes('&page=2')) return response(403, { message: 'Forbidden' });
+      if (url.endsWith('/actions/jobs/2001/logs')) return response(200, 'Error: boom');
+      throw new Error(`unexpected url ${url}`);
+    });
+
+    const evidence = await provider(fetchMock).collectEvidence(failure(), options({ jobsPerPage: 1, maxJobPages: 2 }));
+    expect(evidence.completeness).toBe('partial');
+    expect(evidence.limitations).toEqual(expect.arrayContaining(['forbidden', 'jobs_truncated']));
+    expect(evidence.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining(['execution', 'job:2001', 'error:2001:0'])
+    );
+  });
+
+  it('does not request logs after the jobs endpoint is rate-limited', async () => {
+    const logCalls = vi.fn();
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith('/attempts/2')) return response(200, run());
+      if (url.includes('&page=1')) return response(200, { total_count: 2, jobs: [failedJob] });
+      if (url.includes('&page=2')) return response(429, { message: 'rate limited' });
+      if (url.endsWith('/actions/jobs/2001/logs')) {
+        logCalls();
+        return response(200, 'Error: boom');
+      }
+      throw new Error(`unexpected url ${url}`);
+    });
+
+    const evidence = await provider(fetchMock).collectEvidence(failure(), options({ jobsPerPage: 1, maxJobPages: 2 }));
+    expect(evidence.limitations).toEqual(expect.arrayContaining(['rate_limited', 'jobs_truncated', 'no_error_signal']));
+    expect(logCalls).not.toHaveBeenCalled();
+  });
+
   it('marks a job list as truncated when the API reports more jobs than it returns', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/attempts/2')) return response(200, run());
@@ -498,7 +533,7 @@ describe('GithubDiagnosticProvider', () => {
       });
 
     const rejected = await provider(build(response(404, 'missing'))).collectEvidence(failure(), options());
-    expect(rejected.limitations).toContain('redirect_rejected');
+    expect(rejected.limitations).toContain('logs_unavailable');
     await expect(provider(build(response(500, 'error'))).collectEvidence(failure(), options())).rejects.toThrow(
       'github log download 500'
     );

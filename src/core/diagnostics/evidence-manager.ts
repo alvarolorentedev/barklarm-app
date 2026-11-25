@@ -62,6 +62,7 @@ function statusFor(evidence: DiagnosticEvidence): DiagnosticStatus {
 export class EvidenceManager {
   private sources = new Map<string, DiagnosticObserverSource>();
   private cache = new Map<string, CachedEvidence>();
+  private seen = new Map<string, { key: string; at: number }>();
   private failed = new Map<string, string>();
   private pending = new Map<string, PendingCollection>();
   private queue: QueueItem[] = [];
@@ -107,7 +108,10 @@ export class EvidenceManager {
       }
     }
     for (const id of Array.from(this.cache.keys())) {
-      if (!next.has(id)) this.cache.delete(id);
+      if (!next.has(id)) {
+        this.cache.delete(id);
+        this.seen.delete(id);
+      }
     }
     this.sources = next;
   }
@@ -124,17 +128,21 @@ export class EvidenceManager {
     }));
 
     const current = new Map<string, State>();
+    const present = new Set<string>();
     for (const state of states) {
       if (!state.id) continue;
+      present.add(state.id);
       if (state.status === Status.FAILURE && state.error?.id) {
         current.set(state.id, state);
         this.lastFailures.set(state.id, state);
-      } else {
+      } else if (state.status === Status.SUCCESS || (state.status === Status.FAILURE && !state.error?.id)) {
+        // SUCCESS is a real resolution. NA/CHECKING are temporary/unknown and
+        // keep the last failure evidence until a source actually resolves it.
         this.clearObserver(state.id);
       }
     }
     for (const id of Array.from(this.lastFailures.keys())) {
-      if (!current.has(id)) this.clearObserver(id);
+      if (!present.has(id)) this.clearObserver(id);
     }
 
     if (!this.enabled) return;
@@ -175,6 +183,7 @@ export class EvidenceManager {
     const key = this.key(source, failure.error.id);
     this.abort(observerId);
     this.cache.delete(observerId);
+    this.seen.delete(observerId);
     this.failed.delete(observerId);
     this.enqueue({
       source,
@@ -199,6 +208,7 @@ export class EvidenceManager {
     for (const id of Array.from(this.pending.keys())) this.abort(id);
     this.queue = [];
     this.cache.clear();
+    this.seen.clear();
     this.failed.clear();
     this.lastFailures.clear();
     this.lastStates = [];
@@ -229,6 +239,8 @@ export class EvidenceManager {
       this.cache.delete(source.id);
     }
     if (this.failed.get(source.id) === key) return;
+    const seen = this.seen.get(source.id);
+    if (seen?.key === key && this.now().getTime() - seen.at <= this.limits.cacheTtlMs) return;
 
     const pending = this.pending.get(source.id);
     if (pending?.key === key) return;
@@ -319,7 +331,9 @@ export class EvidenceManager {
         knownSecrets: collectKnownSecrets(source.config),
       });
       if (!this.isCurrent(item, pending)) return;
-      this.cache.set(source.id, { key: item.key, evidence, collectedAt: this.now().getTime() });
+      const collectedAt = this.now().getTime();
+      this.cache.set(source.id, { key: item.key, evidence, collectedAt });
+      this.seen.set(source.id, { key: item.key, at: collectedAt });
       this.failed.delete(source.id);
       this.evict();
     } finally {
@@ -381,6 +395,7 @@ export class EvidenceManager {
   private clearObserver(observerId: string): void {
     this.abort(observerId);
     this.cache.delete(observerId);
+    this.seen.delete(observerId);
     this.failed.delete(observerId);
     this.lastFailures.delete(observerId);
   }
@@ -389,6 +404,7 @@ export class EvidenceManager {
     for (const id of Array.from(this.pending.keys())) this.abort(id);
     this.queue = [];
     this.cache.clear();
+    this.seen.clear();
     this.failed.clear();
     this.lastFailures.clear();
     this.resolveIdle();

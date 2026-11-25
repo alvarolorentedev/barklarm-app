@@ -190,6 +190,7 @@ describe('mock runtime', () => {
     const client = createMockClient({ scenarioName: 'diagnostics-secrets', storage: new MemoryStorage(), reset: true });
     const snapshot = await client.getDiagnosticEvidence('mock-diag-secrets');
 
+    expect(snapshot.status).toBe('partial');
     expect(JSON.stringify(snapshot)).not.toContain('ghp_');
     expect(snapshot.evidence?.limitations).toContain('content_redacted');
     expect(snapshot.evidence?.items.some((item) => item.content.includes('[REDACTED]'))).toBe(true);

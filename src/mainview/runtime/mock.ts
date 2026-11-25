@@ -155,7 +155,7 @@ function executionItem(runId: number, attempt: number, failed = 1): EvidenceItem
   };
 }
 
-function jobItem(jobId: number, name = 'build', conclusion = 'failure'): EvidenceItem {
+function jobItem(jobId: number, name = 'build', conclusion = 'failure', runId = 1001): EvidenceItem {
   return {
     id: `job:${jobId}`,
     category: 'job',
@@ -166,15 +166,15 @@ function jobItem(jobId: number, name = 'build', conclusion = 'failure'): Evidenc
       `Job ID: ${jobId}`,
       'Started: 2026-01-15T10:00:10Z',
       'Completed: 2026-01-15T10:03:00Z',
-      `URL: https://github.com/acme/api/actions/runs/1001/job/${jobId}`,
+      `URL: https://github.com/acme/api/actions/runs/${runId}/job/${jobId}`,
     ].join('\n'),
-    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: name },
+    source: { url: `https://github.com/acme/api/actions/runs/${runId}/job/${jobId}`, label: name },
     timestamp: '2026-01-15T10:00:10Z',
     metadata: { jobId, conclusion },
   };
 }
 
-function stepItem(jobId: number, stepNumber: number, name = 'Run tests'): EvidenceItem {
+function stepItem(jobId: number, stepNumber: number, name = 'Run tests', runId = 1001): EvidenceItem {
   return {
     id: `step:${jobId}:${stepNumber}`,
     category: 'step',
@@ -185,19 +185,19 @@ function stepItem(jobId: number, stepNumber: number, name = 'Run tests'): Eviden
       'Started: 2026-01-15T10:01:00Z',
       'Completed: 2026-01-15T10:02:30Z',
     ].join('\n'),
-    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: name },
+    source: { url: `https://github.com/acme/api/actions/runs/${runId}/job/${jobId}`, label: name },
     timestamp: '2026-01-15T10:01:00Z',
     metadata: { jobId, stepNumber, conclusion: 'failure' },
   };
 }
 
-function errorItem(jobId: number, text: string): EvidenceItem {
+function errorItem(jobId: number, text: string, runId = 1001): EvidenceItem {
   return {
     id: `error:${jobId}:0`,
     category: 'error',
     title: 'Error excerpt from build',
     content: text,
-    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: 'build' },
+    source: { url: `https://github.com/acme/api/actions/runs/${runId}/job/${jobId}`, label: 'build' },
     timestamp: '2026-01-15T10:02:00Z',
     metadata: { jobId, signal: 'dependency-error', startLine: 42, endLine: 48 },
   };
@@ -386,9 +386,9 @@ export const mockScenarios: Record<string, MockScenario> = {
             'Workflow run 2002 attempt 3 failed: 1 failed job(s), 1 error excerpt(s) collected.',
             [
               executionItem(2002, 3),
-              errorItem(3001, 'error TS2322: Type string is not assignable to type number'),
-              jobItem(3001, 'web-build'),
-              stepItem(3001, 2, 'Run unit tests'),
+              errorItem(3001, 'error TS2322: Type string is not assignable to type number', 2002),
+              jobItem(3001, 'web-build', 'failure', 2002),
+              stepItem(3001, 2, 'Run unit tests', 2002),
             ]
           ),
         },
@@ -435,7 +435,7 @@ export const mockScenarios: Record<string, MockScenario> = {
     ['1001:1'],
     {
       enabled: true,
-      fixtures: { 'mock-diag-secrets': { status: 'available', evidence: secretEvidence } },
+      fixtures: { 'mock-diag-secrets': { status: 'partial', evidence: secretEvidence } },
     }
   ),
 };
@@ -522,8 +522,17 @@ export function createMockClient(options: MockClientOptions = {}): AppRPCClient 
         diagnosticPolls[observerId] = remaining - 1;
         return { status: 'collecting' };
       }
+      const completeness = fixture.evidence?.completeness;
+      const status =
+        completeness === 'complete'
+          ? 'available'
+          : completeness === 'partial'
+            ? 'partial'
+            : completeness === 'unavailable'
+              ? 'unavailable'
+              : fixture.status;
       return {
-        status: fixture.status,
+        status,
         ...(fixture.evidence ? { evidence: fixture.evidence } : {}),
       };
     },

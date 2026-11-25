@@ -24,12 +24,15 @@ const LIMITATION = /^[a-z0-9_:-]{1,64}$/;
 const EVIDENCE_ID = /^[A-Za-z0-9_.:-]{1,120}$/;
 const METADATA_KEY = /^[A-Za-z0-9_.-]{1,64}$/;
 const SECRET_KEY = /(token|secret|password|passwd|api[_-]?key|app[_-]?key|auth[_-]?key|access[_-]?key)/i;
+const MAX_SOURCE_URL = 2048;
+const MAX_LIMITATIONS = 50;
+const TRUNCATION_REASON = /^[a-z0-9_-]{1,64}$/i;
 
 function httpUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   try {
     const url = new URL(value);
-    if (url.username || url.password) return undefined;
+    if (url.username || url.password || url.href.length > MAX_SOURCE_URL) return undefined;
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined;
   } catch {
     return undefined;
@@ -48,7 +51,8 @@ function truncation(value: unknown): EvidenceTruncation | undefined {
     truncated: true,
     originalLength: Number.isFinite(candidate.originalLength) ? Number(candidate.originalLength) : 0,
     returnedLength: Number.isFinite(candidate.returnedLength) ? Number(candidate.returnedLength) : 0,
-    reason: typeof candidate.reason === 'string' ? candidate.reason.slice(0, 64) : 'unknown',
+    reason:
+      typeof candidate.reason === 'string' && TRUNCATION_REASON.test(candidate.reason) ? candidate.reason : 'unknown',
   };
 }
 
@@ -86,7 +90,7 @@ function metadata(
       } else {
         const sanitized = sanitizeText(child, knownSecrets);
         if (sanitized.redacted) limitations.add('content_redacted');
-        output[key] = sanitized.text.slice(0, 500);
+        output[key] = sanitized.text.slice(0, 200);
       }
       keys += 1;
     } else if (typeof child === 'number' && Number.isFinite(child)) {
@@ -199,6 +203,7 @@ export function normalizeEvidence(draft: EvidenceDraft, options: NormalizeEviden
   }
 
   for (const limitation of Array.isArray(draft?.limitations) ? draft.limitations : []) {
+    if (limitations.size >= MAX_LIMITATIONS) break;
     if (typeof limitation === 'string' && LIMITATION.test(limitation)) limitations.add(limitation);
   }
 
@@ -224,6 +229,14 @@ export function normalizeEvidence(draft: EvidenceDraft, options: NormalizeEviden
   }
   if (items.length === 0) completeness = 'unavailable';
 
+  const finalLimitations = Array.from(limitations);
+  if (finalLimitations.length > MAX_LIMITATIONS) {
+    finalLimitations.length = MAX_LIMITATIONS;
+    if (redacted && !finalLimitations.includes('content_redacted')) {
+      finalLimitations[MAX_LIMITATIONS - 1] = 'content_redacted';
+    }
+  }
+
   return {
     schemaVersion: 1,
     observerId: options.observerId,
@@ -233,6 +246,6 @@ export function normalizeEvidence(draft: EvidenceDraft, options: NormalizeEviden
     completeness,
     summary: summary.text.slice(0, 400) || 'Evidence collected.',
     items,
-    limitations: Array.from(limitations),
+    limitations: finalLimitations,
   };
 }

@@ -35,6 +35,21 @@ describe('sanitizeText', () => {
     expect(result.redacted).toBe(true);
   });
 
+  it('redacts JSON and quoted credential assignments', () => {
+    const basic = 'Basic dXNlcjpwYXNzd29yZA==';
+    const result = sanitizeText(
+      `{"Authorization": "${basic}", "password": "hunter2", "token": "abc123", 'secret': 'shh'}`,
+      []
+    );
+
+    expect(result.text).not.toContain('dXNlcjpwYXNzd29yZA==');
+    expect(result.text).not.toContain('hunter2');
+    expect(result.text).not.toContain('abc123');
+    expect(result.text).not.toContain('shh');
+    expect(result.text).toContain('[REDACTED]');
+    expect(result.redacted).toBe(true);
+  });
+
   it('redacts credentials embedded in URLs', () => {
     const result = sanitizeText('https://user:supersecret@example.test/repo');
     expect(result.text).not.toContain('supersecret');

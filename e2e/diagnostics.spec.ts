@@ -129,6 +129,7 @@ test('never shows raw synthetic credentials in evidence', async ({ page }) => {
   await expandFirstObserver(page);
 
   const panel = page.getByRole('region', { name: 'Diagnostic evidence' });
+  await expect(panel.locator('.diagnostics-status')).toHaveText('Partial');
   await expect(panel.getByText('[REDACTED]', { exact: false })).toBeVisible();
   await expect(panel).not.toContainText('ghp_');
 });

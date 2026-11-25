@@ -59,9 +59,11 @@ issue webhook are deliberately minimal, so diagnostic context cannot live there.
    line is the error.
 6. Collection is optional, automatic when enabled, non-blocking relative to polling, deduplicated by
    `observerId + diagnosticScope + failureId`, retried at most once for transient failures, and cancelled on
-   configuration change, removal, resolution or shutdown.
-7. Evidence is in-memory only: 25 failures, 30-minute TTL, 20,000 characters and 40 items per envelope. A resolved
-   failure clears its evidence. No raw log persistence.
+   diagnostic scope change, removal, SUCCESS resolution or shutdown. `NA`/`CHECKING` are temporary/unknown and retain
+   the last failure evidence.
+7. Evidence is in-memory only: 25 failures, 30-minute TTL, 20,000 content characters and 40 items per envelope. Titles
+   (200), metadata values (200 each, 20 keys), source URLs (2,048), timestamps (64) and limitation codes (50) are
+   separately bounded. A SUCCESS resolution clears evidence. No raw log persistence.
 8. Sanitization strips control sequences and redacts recognizable authorization values, GitHub tokens, API keys,
    passwords, URL credentials, private keys and configured integration credential values. Pattern-based redaction is not
    a guarantee; residual risk is documented.
@@ -84,8 +86,9 @@ issue webhook are deliberately minimal, so diagnostic context cannot live there.
 ## Data and evidence
 
 Captured: workflow/repository/run/attempt/conclusion/branch/SHA/timestamps/links, failed job and step metadata, bounded
-log excerpts, extracted error signals, completeness and limitations. Not captured: full raw logs, actor identity, email,
-tokens, runner hostnames, unrelated jobs, workflow archives. Redaction is applied before caching and before runtime
+log excerpts, extracted error signals, completeness and limitations. Not captured as structured fields: full raw logs,
+actor identity, email, runner hostnames, tokens, unrelated jobs, workflow archives. Log excerpts may contain incidental
+personal or host data; they are bounded and sanitized, not guaranteed anonymous. Redaction is applied before caching and before runtime
 exposure. No disk, database, telemetry or webhook transmission.
 
 ## Architecture and boundaries
@@ -136,7 +139,7 @@ bun run test:e2e                15 Playwright acceptance tests: passed
 bun run audit                   no high/critical vulnerabilities (32 packages checked)
 ```
 
-Coverage: overall 87.42% lines/statements, 87.45% branches, 85.97% functions; `src/core/**` 93.27% lines/statements,
+Coverage: overall 87.3% lines/statements, 87.43% branches, 85.97% functions; `src/core/**` 93.27% lines/statements,
 91.91% branches, 91.3% functions. No native Rust code changed, so Rust checks were not required for this branch.
 
 Screenshots: `docs/media/diagnostics-complete.png` and `docs/media/diagnostics-partial.png`, captured from

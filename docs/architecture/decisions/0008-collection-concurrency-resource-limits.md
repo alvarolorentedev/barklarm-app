@@ -13,8 +13,9 @@ retries or log downloads would make a failing CI pipeline slow the radiator.
 - One retry for transient/network failures; structured inaccessible/rate-limited results are not retried.
 - 30-second collection timeout and 15-second per-request timeout through `AbortSignal`.
 - 2 MiB response cap enforced while reading; 2 job pages of 100; 20 failed jobs; 5 job-log requests.
-- 4,000 characters per item, 20,000 per envelope, 40 items.
-- Requests stop on configuration change, removal, resolution, disable, timeout or shutdown.
+- 4,000 content characters per item, 20,000 per envelope, 40 items; other fields have separate caps.
+- Requests stop on diagnostic scope change, removal, SUCCESS resolution, disable, timeout or shutdown. A seen marker
+  prevents cache eviction from triggering collection on every poll.
 
 Collection is scheduled after a refresh publishes states and is never awaited by the polling cycle.
 

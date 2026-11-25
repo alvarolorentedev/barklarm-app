@@ -80,8 +80,10 @@ already exist for every integration and drive distinct failure notifications. Gi
   returns a bounded draft. Missing providers report `unsupported`.
 - `EvidenceManager` schedules collection after a refresh publishes states, never inside the polling cycle. It keys
   evidence by `observerId + diagnosticScope + failureId`, deduplicates concurrent work, retries transient failures once,
-  and cancels on configuration change, removal, resolution or shutdown.
-- Evidence is in-memory only: 25 failures, 30-minute TTL, 40 items, 20,000 characters and 4,000 characters per item.
+  and cancels on diagnostic scope change, removal, SUCCESS resolution or shutdown. NA/CHECKING retain the last failure.
+- Evidence is in-memory only: 25 failures, 30-minute TTL, 40 items, 20,000 content characters and 4,000 content
+  characters per item; other fields have separate caps. A seen marker prevents cache eviction from causing a request
+  storm.
 - `normalizeEvidence` strips control sequences, redacts recognizable credentials and enforces size limits before the
   runtime exposes the envelope. Evidence content is untrusted data rendered as text.
 - The UI shows a Diagnostic evidence panel inside an expanded failed observer. The setting is opt-in and defaults to

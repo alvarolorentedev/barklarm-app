@@ -12,8 +12,10 @@ models. Phase 1 must be useful locally without becoming a log archive or a secre
 Evidence is in-memory only and bounded:
 
 - cache 25 failures, 30-minute TTL, oldest-first eviction;
-- 40 items, 4,000 characters per item, 20,000 characters per envelope;
-- resolved failures are cleared immediately;
+- 40 items, 4,000 content characters per item, 20,000 content characters per envelope;
+- titles (200), metadata values (200 each, 20 keys), source URLs (2,048), timestamps (64) and limitation codes (50) are
+  separately bounded;
+- SUCCESS resolutions are cleared immediately; NA/CHECKING retain the last failure evidence;
 - no raw log or API response is persisted, exported or sent.
 
 Before caching, the core strips ANSI/C0/C1 and bidi/zero-width controls and redacts private-key blocks, authorization

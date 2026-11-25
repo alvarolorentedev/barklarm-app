@@ -39,6 +39,7 @@ export type GithubDiagnosticOptions = {
 
 const FAILURE_CONCLUSIONS = ['failure', 'timed_out', 'startup_failure'];
 const FAILED_JOB_CONCLUSIONS = ['failure', 'timed_out'];
+const MAX_SOURCE_URL = 2048;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
@@ -57,7 +58,7 @@ function httpUrl(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   try {
     const url = new URL(value);
-    if (url.username || url.password) return undefined;
+    if (url.username || url.password || url.href.length > MAX_SOURCE_URL) return undefined;
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : undefined;
   } catch {
     return undefined;
@@ -273,6 +274,8 @@ export class GithubDiagnosticProvider implements DiagnosticProvider {
     const steps: EvidenceItem[] = [];
     const logRequests = Math.min(failedJobs.length, options.limits.maxLogRequests);
     if (failedJobs.length > options.limits.maxLogRequests) limitations.add('log_requests_truncated');
+    // A rate-limited or unauthenticated source will reject log requests too.
+    const skipLogs = limitations.has('rate_limited') || limitations.has('auth_failed');
 
     for (let index = 0; index < failedJobs.length; index += 1) {
       const job = failedJobs[index];
@@ -337,7 +340,7 @@ export class GithubDiagnosticProvider implements DiagnosticProvider {
       }
       if (failedSteps === 0 && rawSteps.length === 0) limitations.add('job_steps_unavailable');
 
-      if (index < logRequests) {
+      if (!skipLogs && index < logRequests) {
         const log = await this.getJobLog(jobId, options);
         if (log.limitation) limitations.add(log.limitation);
         if (log.text !== undefined) {
@@ -553,7 +556,9 @@ export class GithubDiagnosticProvider implements DiagnosticProvider {
     }
     if (!isOk(download, downloadStatus) || downloadStatus < 200 || downloadStatus >= 300) {
       discard(download);
-      return { limitation: 'redirect_rejected' };
+      if (downloadStatus === 429) return { limitation: 'rate_limited' };
+      if (downloadStatus >= 300 && downloadStatus < 400) return { limitation: 'redirect_rejected' };
+      return { limitation: 'logs_unavailable' };
     }
     const body = await readBody(download, options.limits.maxResponseBytes);
     if (body.tooLarge) return { limitation: 'log_too_large' };

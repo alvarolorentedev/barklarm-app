@@ -47,9 +47,12 @@ Diagnostic collection is opt-in and disabled by default. When enabled, supported
 operational data for the exact failed event while the app is running.
 
 - Collected: execution metadata, failed jobs and steps, bounded log excerpts, error signals, completeness and source
-  links. Not collected: full raw logs, workflow archives, actor identity, email, unrelated jobs or runner hostnames.
-- Evidence is memory-only: 25 failures, 30-minute TTL, 40 items, 20,000 characters per envelope and 4,000 per item. It is
-  never written to disk, exported, added to `State`, sent to the issue webhook or transmitted to telemetry.
+  links. Not captured as structured fields: full raw logs, workflow archives, actor identity, email, unrelated jobs or
+  runner hostnames. Log excerpts may contain incidental personal or host data; they are bounded and sanitized, not
+  guaranteed anonymous.
+- Evidence is memory-only: 25 failures, 30-minute TTL, 40 items, 20,000 content characters per envelope and 4,000 per
+  item. Titles, metadata values, source URLs and limitation codes are separately capped. Evidence is never written to
+  disk, exported, added to `State`, sent to the issue webhook or transmitted to telemetry.
 - The normalizer strips ANSI/C0/C1 and bidi/zero-width control sequences and redacts recognizable authorization headers,
   bearer values, GitHub tokens, API-key/password assignments, URL credentials, private keys, JWTs and selected cloud
   keys. Configured credential values are removed exactly when their key name marks them as secrets.
@@ -57,8 +60,11 @@ operational data for the exact failed event while the app is running.
   `*.blob.core.windows.net`, `*.githubusercontent.com` or `github.com`, never with the Authorization header, and never
   with URL credentials or non-standard ports. Unexpected redirects become `redirect_rejected` evidence.
 - Evidence is untrusted data: it is rendered as text, never HTML; commands in logs are never executed; external links
-  must be HTTP(S). Provider responses are size-bounded while reading.
+  must be HTTP(S). Streamed provider responses are bounded while reading; the text fallback is truncated immediately
+  after reading. Source URLs with embedded credentials are rejected.
 - GitHub failure identity is `<run_id>:<run_attempt>`, so a rerun cannot reuse another attempt's evidence.
+- A seen marker prevents cache eviction from re-triggering collection on every poll. NA/CHECKING do not clear evidence;
+  only SUCCESS or a new failure changes it.
 
 Pattern-based redaction is a safety net, not a proof. Encoded, split, transformed or unrecognized secrets may survive.
 Redaction also changes evidence, so the envelope reports `content_redacted` and downgrades completeness to `partial`.
