@@ -21,6 +21,8 @@ services or a backend unless an approved task says so.
    webhooks.
 6. [docs/engineering/AGENTIC_WORKFLOW.md](docs/engineering/AGENTIC_WORKFLOW.md) for task and review flow.
 7. [docs/product/](docs/product/) for why a feature exists.
+8. [docs/engineering/AI_EVALUATION.md](docs/engineering/AI_EVALUATION.md) before touching future diagnostic evidence or
+   evaluation fixtures.
 
 Architectural decisions live in [docs/architecture/decisions/](docs/architecture/decisions/). Check them before
 proposing a new boundary; add one when a consequential decision changes.
@@ -62,6 +64,7 @@ src/types/             Shared contracts (State, Observer, configuration, status)
 src-tauri/             Rust shell, config persistence, native menu/tray integration
 e2e/                   Playwright specs against the mock runtime
 docs/                  Product, architecture, engineering and spec documentation
+fixtures/              Sanitized synthetic fixtures for future diagnostic evaluations
 scripts/               Deterministic repository checks
 ```
 
