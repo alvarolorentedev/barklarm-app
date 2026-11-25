@@ -43,10 +43,10 @@ fn install_menu_image_visibility_fix() -> bool {
 
     let block = RcBlock::new(|notification: NonNull<NSNotification>| unsafe {
         let notification = notification.as_ref();
-        if let Some(object) = notification.object() {
-            if let Some(menu) = object.downcast_ref::<NSMenu>() {
-                make_images_visible(menu);
-            }
+        if let Some(object) = notification.object()
+            && let Some(menu) = object.downcast_ref::<NSMenu>()
+        {
+            make_images_visible(menu);
         }
     });
 
