@@ -81,15 +81,16 @@
     "@tauri-apps/plugin-http": "^2.9.0",
     "@tauri-apps/plugin-notification": "^2.8.1",
     "@tauri-apps/plugin-opener": "^2.7.3",
-    "fast-xml-parser": "4.4.1",
+    "fast-xml-parser": "^4.5.5",
     "lucide-react": "^1.73.0",
     "react": "18.3.1",
     "react-aria-components": "^1.22.1",
     "react-dom": "18.3.1",
-    "react-router-dom": "6.26.0"
+    "react-router-dom": "^6.30.4"
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "4.20.0",
     "@rollup/rollup-win32-x64-msvc": "4.20.0"
-  }
+  },
+  "packageManager": "bun@1.4.5"
 }

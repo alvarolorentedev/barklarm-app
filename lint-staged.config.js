@@ -1,3 +1,3 @@
 module.exports = {
-    '*.{ts,tsx}': [() => 'npm run tsc:check', 'npm run format:fix', 'npm run lint:fix', 'npm run test', 'git add .'],
-  };
+  '*.{ts,tsx}': ['bun run tsc:check', 'bun run format:fix', 'bun run lint:fix', 'bun run test'],
+};
