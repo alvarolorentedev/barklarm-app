@@ -38,6 +38,14 @@ const requiredScenarios = [
   'unavailable',
   'multiple-failures',
   'persistence',
+  'diagnostics-complete',
+  'diagnostics-partial',
+  'diagnostics-unavailable',
+  'diagnostics-multiple',
+  'diagnostics-unsupported',
+  'diagnostics-disabled',
+  'diagnostics-collecting',
+  'diagnostics-secrets',
 ];
 
 describe('mock runtime', () => {
@@ -96,5 +104,101 @@ describe('mock runtime', () => {
 
     expect(await resetClient.getStore('autostart')).toBe(true);
     expect(storage.getItem('unrelated')).toBe('keep');
+  });
+
+  it('seeds the diagnostic setting per scenario', async () => {
+    const complete = createMockClient({
+      scenarioName: 'diagnostics-complete',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const disabled = createMockClient({
+      scenarioName: 'diagnostics-disabled',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+
+    expect(await complete.getStore('diagnosticsEnabled')).toBe(true);
+    expect(await disabled.getStore('diagnosticsEnabled')).toBe(false);
+  });
+
+  it('serves complete evidence for a supported observer', async () => {
+    const client = createMockClient({
+      scenarioName: 'diagnostics-complete',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const snapshot = await client.getDiagnosticEvidence('mock-diag-complete');
+
+    expect(snapshot.status).toBe('available');
+    expect(snapshot.evidence).toMatchObject({
+      schemaVersion: 1,
+      observerId: 'mock-diag-complete',
+      failureId: '1001:1',
+      sourceType: 'githubAction',
+      completeness: 'complete',
+    });
+    expect(snapshot.evidence?.items.map((item) => item.id)).toEqual(
+      expect.arrayContaining(['execution', 'job:2001', 'step:2001:2', 'error:2001:0'])
+    );
+  });
+
+  it('reports integrations without diagnostic support', async () => {
+    const client = createMockClient({
+      scenarioName: 'diagnostics-unsupported',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+
+    expect(await client.getDiagnosticEvidence('mock-diag-sentry')).toEqual({ status: 'unsupported' });
+  });
+
+  it('reports disabled diagnostics until the user opts in', async () => {
+    const client = createMockClient({
+      scenarioName: 'diagnostics-disabled',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+
+    expect(await client.getDiagnosticEvidence('mock-diag-disabled')).toEqual({ status: 'disabled' });
+
+    await client.setStore('diagnosticsEnabled', true);
+    const snapshot = await client.getDiagnosticEvidence('mock-diag-disabled');
+
+    expect(snapshot.status).toBe('available');
+    expect(snapshot.evidence?.observerId).toBe('mock-diag-disabled');
+  });
+
+  it('simulates collecting and manual recollection', async () => {
+    const client = createMockClient({
+      scenarioName: 'diagnostics-collecting',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('collecting');
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('collecting');
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('collecting');
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('collecting');
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('available');
+
+    await client.recollectDiagnosticEvidence('mock-diag-collecting');
+    expect((await client.getDiagnosticEvidence('mock-diag-collecting')).status).toBe('collecting');
+  });
+
+  it('serves only already-redacted synthetic credentials', async () => {
+    const client = createMockClient({ scenarioName: 'diagnostics-secrets', storage: new MemoryStorage(), reset: true });
+    const snapshot = await client.getDiagnosticEvidence('mock-diag-secrets');
+
+    expect(JSON.stringify(snapshot)).not.toContain('ghp_');
+    expect(snapshot.evidence?.limitations).toContain('content_redacted');
+    expect(snapshot.evidence?.items.some((item) => item.content.includes('[REDACTED]'))).toBe(true);
+  });
+
+  it('only opens HTTP(S) links', async () => {
+    const client = createMockClient({ scenarioName: 'healthy', storage: new MemoryStorage(), reset: true });
+
+    expect(await client.openExternal('https://github.com/acme/api/actions/runs/1')).toBe(true);
+    expect(await client.openExternal('javascript:alert(1)')).toBe(false);
   });
 });

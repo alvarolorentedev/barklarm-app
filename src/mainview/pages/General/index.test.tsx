@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { General } from './index';
 import { expect, describe, it, vi } from 'vitest';
@@ -17,6 +17,8 @@ vi.mock('./helpers/storage', () => ({
     saveissueGlobalEndpoint: vi.fn(),
     getAutostart: vi.fn().mockResolvedValue(true),
     saveAutostart: vi.fn(),
+    getDiagnosticsEnabled: vi.fn().mockResolvedValue(false),
+    saveDiagnosticsEnabled: vi.fn(),
     importConfig: vi.fn(),
     exportConfig: vi.fn(),
     quit: vi.fn(),
@@ -30,10 +32,21 @@ describe('General', () => {
     expect(screen.getByText('General')).toBeInTheDocument();
     expect(screen.getByText('Monitoring')).toBeInTheDocument();
     expect(screen.getByLabelText('Refresh interval')).toHaveValue(1);
+    expect(screen.getByRole('switch', { name: 'Diagnostic evidence' })).not.toBeChecked();
     expect(screen.getByText('Startup')).toBeInTheDocument();
     expect(screen.getByLabelText('Start at login')).toBeInTheDocument();
     expect(screen.getByText('Backup')).toBeInTheDocument();
     expect(screen.getByText('Advanced')).toBeInTheDocument();
     expect(screen.getByText('Quit Barklarm')).toBeInTheDocument();
+  });
+
+  it('toggles diagnostic collection locally', async () => {
+    render(<General />);
+    const toggle = screen.getByRole('switch', { name: 'Diagnostic evidence' });
+    await screen.findByText('Diagnostics');
+
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(toggle).toBeChecked();
   });
 });

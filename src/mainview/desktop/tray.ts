@@ -33,7 +33,7 @@ function showConfigureWindow(): void {
   void invoke('show_window');
 }
 
-function openExternal(url: string): void {
+export function openExternal(url: string): void {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;

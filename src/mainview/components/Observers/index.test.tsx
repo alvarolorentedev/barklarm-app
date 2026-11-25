@@ -16,6 +16,14 @@ vi.mock('../../../extensions/observersComponentBuilderMap', () => ({
   },
 }));
 
+vi.mock('../../rpc-client', () => ({
+  client: {
+    getDiagnosticEvidence: vi.fn().mockResolvedValue({ status: 'disabled' }),
+    recollectDiagnosticEvidence: vi.fn(),
+    openExternal: vi.fn(),
+  },
+}));
+
 vi.mock('../../../extensions/observersTitleBuilderMap', () => ({
   __esModule: true,
   observersTitleBuilderMap: {
@@ -101,5 +109,25 @@ describe('Observers', () => {
 
     expect(screen.getByText('Github: alpha')).toBeInTheDocument();
     expect(screen.queryByText('Github: beta')).not.toBeInTheDocument();
+  });
+
+  it('shows the diagnostic panel for an expanded failed observer', async () => {
+    renderObservers(
+      [{ id: 'observer-1', type: 'githubAction', alias: 'build' }],
+      [
+        {
+          id: 'observer-1',
+          name: 'build',
+          status: Status.FAILURE,
+          link: '',
+          error: { id: '1:1', description: 'failed' },
+        },
+      ]
+    );
+
+    fireEvent.click(screen.getByRole('button', { expanded: false }));
+
+    expect(screen.getByText('Diagnostic evidence')).toBeInTheDocument();
+    expect(await screen.findByText('Disabled')).toBeInTheDocument();
   });
 });

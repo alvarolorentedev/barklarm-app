@@ -15,13 +15,15 @@ import {
   normalizeObservables,
   normalizeRefreshInterval,
 } from '../../core/config';
+import { EvidenceManager } from '../../core/diagnostics/evidence-manager';
 import { initialize as initializeI18n } from '../../core/i18n';
+import { isHttpUrl } from '../../core/issue';
 import { NotificationManager } from '../../core/notification';
 import { ObserverManager, ObserverPresenter } from '../../core/observer-manager';
 import { setFetchImplementation } from '../../extensions/fetch-adapter';
 import { State } from '../../types/State';
 import type { AppRPCClient } from '../runtime/types';
-import { setupAppMenu, TrayPresenter } from './tray';
+import { openExternal as openExternalUrl, setupAppMenu, TrayPresenter } from './tray';
 
 const noopPresenter: ObserverPresenter = {
   updateImage: () => undefined,
@@ -30,6 +32,7 @@ const noopPresenter: ObserverPresenter = {
 
 let config: BarklarmConfig = { ...DEFAULT_CONFIG };
 let manager: ObserverManager | null = null;
+let evidence: EvidenceManager | null = null;
 let tray: TrayPresenter | null = null;
 let readyPromise: Promise<void> | null = null;
 
@@ -75,6 +78,7 @@ async function applyAutostart(): Promise<void> {
 
 async function applyConfig(): Promise<void> {
   if (!manager) return;
+  evidence?.setEnabled(Boolean(config.diagnosticsEnabled));
   manager.setRefreshInterval(normalizeRefreshInterval(config.refreshInterval));
   tray?.setEndpoint(config.issueGlobalEndpoint || '');
   await manager.refreshObservers(config.observables || []);
@@ -108,7 +112,8 @@ async function initialize(): Promise<void> {
       return null;
     });
     await setupAppMenu().catch((error) => console.error('Failed to set app menu:', error));
-    manager = new ObserverManager(tray || noopPresenter, notifications);
+    evidence = new EvidenceManager({ enabled: Boolean(config.diagnosticsEnabled) });
+    manager = new ObserverManager(tray || noopPresenter, notifications, undefined, evidence);
     manager.start(normalizeRefreshInterval(config.refreshInterval));
     await manager.refreshObservers(config.observables || []);
     await applyAutostart();
@@ -173,6 +178,7 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       if (key === 'observables') await manager?.refreshObservers(config.observables || []);
       if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
       if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
+      if (key === 'diagnosticsEnabled') evidence?.setEnabled(Boolean(value));
       if (key === 'autostart') await applyAutostart();
     },
 
@@ -186,10 +192,28 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       return manager?.getStates() || [];
     },
 
+    async getDiagnosticEvidence(observerId: string) {
+      await ready();
+      return evidence?.getSnapshot(observerId) ?? { status: 'disabled' as const };
+    },
+
+    async recollectDiagnosticEvidence(observerId: string): Promise<void> {
+      await ready();
+      evidence?.recollect(observerId);
+    },
+
+    async openExternal(url: string): Promise<boolean> {
+      await ready();
+      if (!isHttpUrl(url)) return false;
+      openExternalUrl(url);
+      return true;
+    },
+
     importConfig,
     exportConfig,
 
     async quit(): Promise<boolean> {
+      manager?.destroy();
       await invoke('quit_app');
       return true;
     },

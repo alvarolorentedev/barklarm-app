@@ -5,6 +5,8 @@ import { observersTitleBuilderMap } from '../../../extensions/observersTitleBuil
 import { observersList } from '../../../extensions/observersList';
 import { ObserversParams } from '../../../types/ObserversParams';
 import { State } from '../../../types/State';
+import { Status } from '../../../types/Status';
+import { DiagnosticPanel } from '../Diagnostics';
 import { StatusPill } from '../StatusPill';
 import Select, { MenuItem } from '../fields/Select';
 import Switch from '../fields/Switch';
@@ -92,6 +94,7 @@ export const Observers = ({
         ) : (
           visible.map(({ observable, index }) => {
             const isExpanded = expanded === index;
+            const state = statesById.get(observable.id) ?? states[index];
             return (
               <div className="observer-item" key={`observer-${index}`}>
                 <div className={`observer-row${isExpanded ? ' is-expanded' : ''}`}>
@@ -107,7 +110,7 @@ export const Observers = ({
                     </span>
                     <span className="observer-type">{getTypeLabel(observable.type)}</span>
                     <span className="observer-status">
-                      <StatusPill status={statesById.get(observable.id)?.status ?? states[index]?.status} />
+                      <StatusPill status={state?.status} />
                     </span>
                   </button>
                   <button type="button" className="observer-remove" onClick={() => removeObserver(index)}>
@@ -148,6 +151,10 @@ export const Observers = ({
                     ) : (
                       <p className="observer-hint">{translate('Choose a source type to configure it.')}</p>
                     )}
+
+                    {observable.id && state?.status === Status.FAILURE ? (
+                      <DiagnosticPanel observerId={observable.id} failureKey={state.error?.id} />
+                    ) : null}
 
                     <div className="observer-editor-footer">
                       <Switch

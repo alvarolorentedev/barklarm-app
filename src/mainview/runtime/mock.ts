@@ -1,4 +1,6 @@
 import { BarklarmConfig, DEFAULT_CONFIG, normalizeConfig, normalizeObservables } from '../../core/config';
+import { isHttpUrl } from '../../core/issue';
+import { DiagnosticCompleteness, DiagnosticEvidence, DiagnosticSnapshot, EvidenceItem } from '../../types/Diagnostics';
 import { ObserverConfiguration } from '../../types/ObserverConfiguration';
 import { State } from '../../types/State';
 import { Status } from '../../types/Status';
@@ -10,14 +12,28 @@ import type { AppRPCClient } from './types';
  */
 export const MOCK_RUNTIME_MARKER = '__BARKLARM_MOCK_RUNTIME__';
 
+type MockDiagnosticFixture = {
+  status: 'available' | 'partial' | 'unavailable';
+  evidence?: DiagnosticEvidence;
+  /** Number of reads that report collecting before the fixture settles. */
+  pollsUntilReady?: number;
+};
+
+type MockDiagnostics = {
+  enabled: boolean;
+  fixtures: Record<string, MockDiagnosticFixture>;
+};
+
 export type MockScenario = {
   name: string;
   description: string;
   observers: ObserverConfiguration[];
   stateFor: (config: ObserverConfiguration, index: number) => State;
+  diagnostics?: MockDiagnostics;
 };
 
 export const MOCK_STORAGE_PREFIX = 'barklarm.mock.v1';
+const DIAGNOSTIC_TIME = '2026-01-15T12:00:00.000Z';
 
 const github = (id: string, alias: string, extra: Record<string, unknown> = {}): ObserverConfiguration =>
   ({
@@ -82,15 +98,184 @@ function statusScenario(
   description: string,
   observers: ObserverConfiguration[],
   statuses: Status[],
-  errorIds: string[] = []
+  errorIds: string[] = [],
+  diagnostics?: MockDiagnostics
 ): MockScenario {
   return {
     name,
     description,
     observers,
     stateFor: (config, index) => buildState(config, statuses[index] ?? Status.SUCCESS, errorIds[index]),
+    diagnostics,
   };
 }
+
+function evidence(
+  observerId: string,
+  failureId: string,
+  completeness: DiagnosticCompleteness,
+  summary: string,
+  items: EvidenceItem[],
+  limitations: string[] = []
+): DiagnosticEvidence {
+  return {
+    schemaVersion: 1,
+    observerId,
+    failureId,
+    sourceType: 'githubAction',
+    collectedAt: DIAGNOSTIC_TIME,
+    completeness,
+    summary,
+    items,
+    limitations,
+  };
+}
+
+function executionItem(runId: number, attempt: number, failed = 1): EvidenceItem {
+  return {
+    id: 'execution',
+    category: 'execution',
+    title: 'Workflow execution: CI',
+    content: [
+      'Repository: acme/api',
+      'Workflow: CI',
+      `Run: ${runId} (attempt ${attempt})`,
+      'Conclusion: failure',
+      'Branch: main',
+      'Commit: 4f2c1ab',
+      'Event: push',
+      'Created: 2026-01-15T10:00:00Z',
+      'Started: 2026-01-15T10:00:05Z',
+      'Updated: 2026-01-15T10:04:00Z',
+      `Jobs: 2 total; ${failed} failed; 0 cancelled; ${failed === 1 ? 1 : 0} succeeded`,
+    ].join('\n'),
+    source: { url: `https://github.com/acme/api/actions/runs/${runId}`, label: 'CI' },
+    timestamp: '2026-01-15T10:00:00Z',
+    metadata: { runId, runAttempt: attempt, conclusion: 'failure' },
+  };
+}
+
+function jobItem(jobId: number, name = 'build', conclusion = 'failure'): EvidenceItem {
+  return {
+    id: `job:${jobId}`,
+    category: 'job',
+    title: `Job: ${name}`,
+    content: [
+      `Job: ${name}`,
+      `Conclusion: ${conclusion}`,
+      `Job ID: ${jobId}`,
+      'Started: 2026-01-15T10:00:10Z',
+      'Completed: 2026-01-15T10:03:00Z',
+      `URL: https://github.com/acme/api/actions/runs/1001/job/${jobId}`,
+    ].join('\n'),
+    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: name },
+    timestamp: '2026-01-15T10:00:10Z',
+    metadata: { jobId, conclusion },
+  };
+}
+
+function stepItem(jobId: number, stepNumber: number, name = 'Run tests'): EvidenceItem {
+  return {
+    id: `step:${jobId}:${stepNumber}`,
+    category: 'step',
+    title: `Step: ${name}`,
+    content: [
+      `Step: ${stepNumber}: ${name}`,
+      'Conclusion: failure',
+      'Started: 2026-01-15T10:01:00Z',
+      'Completed: 2026-01-15T10:02:30Z',
+    ].join('\n'),
+    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: name },
+    timestamp: '2026-01-15T10:01:00Z',
+    metadata: { jobId, stepNumber, conclusion: 'failure' },
+  };
+}
+
+function errorItem(jobId: number, text: string): EvidenceItem {
+  return {
+    id: `error:${jobId}:0`,
+    category: 'error',
+    title: 'Error excerpt from build',
+    content: text,
+    source: { url: `https://github.com/acme/api/actions/runs/1001/job/${jobId}`, label: 'build' },
+    timestamp: '2026-01-15T10:02:00Z',
+    metadata: { jobId, signal: 'dependency-error', startLine: 42, endLine: 48 },
+  };
+}
+
+const completeEvidence = evidence(
+  'mock-diag-complete',
+  '1001:1',
+  'complete',
+  'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+  [
+    executionItem(1001, 1),
+    errorItem(2001, 'npm ERR! code ERESOLVE\nnpm ERR! Could not resolve dependency: peer react@18'),
+    jobItem(2001),
+    stepItem(2001, 2),
+  ]
+);
+
+const partialEvidence = evidence(
+  'mock-diag-partial',
+  '1001:1',
+  'partial',
+  'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected. Evidence is partial; see limitations.',
+  [
+    executionItem(1001, 1),
+    {
+      ...errorItem(2001, 'error TS2322: Type string is not assignable to type number'),
+      truncation: { truncated: true, originalLength: 4800, returnedLength: 1600, reason: 'log_excerpt_limit' },
+    },
+    jobItem(2001),
+    stepItem(2001, 2),
+  ],
+  ['logs_unavailable', 'content_truncated']
+);
+
+const disabledEvidence = evidence(
+  'mock-diag-disabled',
+  '1001:1',
+  'complete',
+  'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+  completeEvidence.items
+);
+
+const unavailableEvidence = evidence(
+  'mock-diag-unavailable',
+  '1001:1',
+  'unavailable',
+  'Evidence unavailable: GitHub did not return the requested workflow run attempt.',
+  [],
+  ['run_not_found']
+);
+
+const collectingEvidence = evidence(
+  'mock-diag-collecting',
+  '1001:1',
+  'complete',
+  'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+  [
+    executionItem(1001, 1),
+    errorItem(2001, 'npm ERR! code ERESOLVE\nnpm ERR! Could not resolve dependency: peer react@18'),
+    jobItem(2001),
+    stepItem(2001, 2),
+  ]
+);
+
+const secretEvidence = evidence(
+  'mock-diag-secrets',
+  '1001:1',
+  'partial',
+  'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+  [
+    executionItem(1001, 1),
+    errorItem(2001, 'Authorization: [REDACTED]\npassword: [REDACTED]\nError: upstream returned 401'),
+    jobItem(2001),
+    stepItem(2001, 2),
+  ],
+  ['content_redacted']
+);
 
 export const mockScenarios: Record<string, MockScenario> = {
   empty: statusScenario('empty', 'No configured observers.', [], []),
@@ -140,6 +325,119 @@ export const mockScenarios: Record<string, MockScenario> = {
     [github('mock-github-persist', 'API build'), sentry('mock-sentry-persist', 'API errors')],
     [Status.SUCCESS, Status.SUCCESS]
   ),
+  'diagnostics-complete': statusScenario(
+    'diagnostics-complete',
+    'One failed workflow with complete diagnostic evidence.',
+    [github('mock-diag-complete', 'API build'), cctray('mock-cctray-ok', 'Nightly release')],
+    [Status.FAILURE, Status.SUCCESS],
+    ['1001:1'],
+    {
+      enabled: true,
+      fixtures: { 'mock-diag-complete': { status: 'available', evidence: completeEvidence } },
+    }
+  ),
+  'diagnostics-partial': statusScenario(
+    'diagnostics-partial',
+    'One failed workflow with partial evidence and an inaccessible log.',
+    [github('mock-diag-partial', 'API build')],
+    [Status.FAILURE],
+    ['1001:1'],
+    {
+      enabled: true,
+      fixtures: { 'mock-diag-partial': { status: 'partial', evidence: partialEvidence } },
+    }
+  ),
+  'diagnostics-unavailable': statusScenario(
+    'diagnostics-unavailable',
+    'A deleted or inaccessible workflow run.',
+    [github('mock-diag-unavailable', 'API build')],
+    [Status.FAILURE],
+    ['1001:1'],
+    {
+      enabled: true,
+      fixtures: { 'mock-diag-unavailable': { status: 'unavailable', evidence: unavailableEvidence } },
+    }
+  ),
+  'diagnostics-multiple': statusScenario(
+    'diagnostics-multiple',
+    'Two independent failed workflows with separate evidence.',
+    [github('mock-diag-one', 'API build'), github('mock-diag-two', 'Web build', { repo: 'web' })],
+    [Status.FAILURE, Status.FAILURE],
+    ['1001:1', '2002:3'],
+    {
+      enabled: true,
+      fixtures: {
+        'mock-diag-one': {
+          status: 'available',
+          evidence: evidence(
+            'mock-diag-one',
+            '1001:1',
+            'complete',
+            'Workflow run 1001 attempt 1 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+            completeEvidence.items
+          ),
+        },
+        'mock-diag-two': {
+          status: 'available',
+          evidence: evidence(
+            'mock-diag-two',
+            '2002:3',
+            'complete',
+            'Workflow run 2002 attempt 3 failed: 1 failed job(s), 1 error excerpt(s) collected.',
+            [
+              executionItem(2002, 3),
+              errorItem(3001, 'error TS2322: Type string is not assignable to type number'),
+              jobItem(3001, 'web-build'),
+              stepItem(3001, 2, 'Run unit tests'),
+            ]
+          ),
+        },
+      },
+    }
+  ),
+  'diagnostics-unsupported': statusScenario(
+    'diagnostics-unsupported',
+    'A failed integration without diagnostic support.',
+    [sentry('mock-diag-sentry', 'API errors')],
+    [Status.FAILURE],
+    ['event-9001'],
+    { enabled: true, fixtures: {} }
+  ),
+  'diagnostics-disabled': statusScenario(
+    'diagnostics-disabled',
+    'A failed workflow while diagnostic collection is disabled.',
+    [github('mock-diag-disabled', 'API build')],
+    [Status.FAILURE],
+    ['1001:1'],
+    {
+      enabled: false,
+      fixtures: { 'mock-diag-disabled': { status: 'available', evidence: disabledEvidence } },
+    }
+  ),
+  'diagnostics-collecting': statusScenario(
+    'diagnostics-collecting',
+    'Evidence collection in progress, then available.',
+    [github('mock-diag-collecting', 'API build')],
+    [Status.FAILURE],
+    ['1001:1'],
+    {
+      enabled: true,
+      fixtures: {
+        'mock-diag-collecting': { status: 'available', evidence: collectingEvidence, pollsUntilReady: 4 },
+      },
+    }
+  ),
+  'diagnostics-secrets': statusScenario(
+    'diagnostics-secrets',
+    'Synthetic credential-like content already redacted in evidence.',
+    [github('mock-diag-secrets', 'API build')],
+    [Status.FAILURE],
+    ['1001:1'],
+    {
+      enabled: true,
+      fixtures: { 'mock-diag-secrets': { status: 'available', evidence: secretEvidence } },
+    }
+  ),
 };
 
 export function resolveMockScenario(name?: string | null): MockScenario {
@@ -176,7 +474,12 @@ export function createMockClient(options: MockClientOptions = {}): AppRPCClient 
 
   let config =
     readConfig(storage, key) ??
-    normalizeConfig({ ...DEFAULT_CONFIG, observables: normalizeObservables(scenario.observers) });
+    normalizeConfig({
+      ...DEFAULT_CONFIG,
+      diagnosticsEnabled: scenario.diagnostics?.enabled ?? false,
+      observables: normalizeObservables(scenario.observers),
+    });
+  const diagnosticPolls: Record<string, number> = {};
 
   const persist = (): void => {
     try {
@@ -207,6 +510,29 @@ export function createMockClient(options: MockClientOptions = {}): AppRPCClient 
     },
     async getObserverStates(): Promise<State[]> {
       return (config.observables || []).map((observer, index) => scenario.stateFor(observer, index));
+    },
+    async getDiagnosticEvidence(observerId: string): Promise<DiagnosticSnapshot> {
+      if (!config.diagnosticsEnabled) return { status: 'disabled' };
+      const observer = (config.observables || []).find((item) => item.id === observerId);
+      if (!observer || observer.type !== 'githubAction') return { status: 'unsupported' };
+      const fixture = scenario.diagnostics?.fixtures[observerId];
+      if (!fixture) return { status: 'not_collected' };
+      const remaining = diagnosticPolls[observerId] ?? fixture.pollsUntilReady ?? 0;
+      if (remaining > 0) {
+        diagnosticPolls[observerId] = remaining - 1;
+        return { status: 'collecting' };
+      }
+      return {
+        status: fixture.status,
+        ...(fixture.evidence ? { evidence: fixture.evidence } : {}),
+      };
+    },
+    async recollectDiagnosticEvidence(observerId: string): Promise<void> {
+      const fixture = scenario.diagnostics?.fixtures[observerId];
+      if (fixture) diagnosticPolls[observerId] = fixture.pollsUntilReady ?? 2;
+    },
+    async openExternal(url: string): Promise<boolean> {
+      return isHttpUrl(url);
     },
     async importConfig(): Promise<boolean> {
       return false;

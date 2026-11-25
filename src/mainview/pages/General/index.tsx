@@ -11,6 +11,7 @@ export const General = () => {
   const [refreshInterval, setRefreshInterval] = useState(60000);
   const [issueGlobalEndpoint, setIssueGlobalEndpoint] = useState('');
   const [autostart, setAutostart] = useState(true);
+  const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
   const {
     getSslDisabled,
     saveSslDisabled,
@@ -20,20 +21,27 @@ export const General = () => {
     saveissueGlobalEndpoint,
     getAutostart,
     saveAutostart,
+    getDiagnosticsEnabled,
+    saveDiagnosticsEnabled,
     importConfig,
     exportConfig,
     quit,
   } = storage();
 
   useEffect(() => {
-    Promise.all([getSslDisabled(), getRefreshInterval(), getissueGlobalEndpoint(), getAutostart()]).then(
-      ([ssl, interval, endpoint, startAtLogin]) => {
-        setSslDisabled(ssl);
-        setRefreshInterval(interval);
-        setIssueGlobalEndpoint(endpoint);
-        setAutostart(startAtLogin);
-      }
-    );
+    Promise.all([
+      getSslDisabled(),
+      getRefreshInterval(),
+      getissueGlobalEndpoint(),
+      getAutostart(),
+      getDiagnosticsEnabled(),
+    ]).then(([ssl, interval, endpoint, startAtLogin, diagnostics]) => {
+      setSslDisabled(ssl);
+      setRefreshInterval(interval);
+      setIssueGlobalEndpoint(endpoint);
+      setAutostart(startAtLogin);
+      setDiagnosticsEnabled(diagnostics);
+    });
   }, []);
 
   const updateRefreshInterval = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,6 +86,24 @@ export const General = () => {
             }}
             placeholder="https://..."
             aria-label={translate('Issue endpoint')}
+          />
+        </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Diagnostics')}>
+        <SettingsRow
+          label={translate('Diagnostic evidence')}
+          description={translate(
+            'When a build fails, retrieve failed jobs, steps and bounded log excerpts from supported integrations. Data stays on this device; Barklarm redacts recognizable credentials but cannot guarantee every secret is removed. Disabled by default.'
+          )}
+        >
+          <Switch
+            checked={diagnosticsEnabled}
+            ariaLabel={translate('Diagnostic evidence')}
+            onChange={(event) => {
+              saveDiagnosticsEnabled(event.target.checked);
+              setDiagnosticsEnabled(event.target.checked);
+            }}
           />
         </SettingsRow>
       </SettingsGroup>

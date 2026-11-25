@@ -25,6 +25,12 @@ export const storage = () => ({
   saveAutostart: async (autostart: boolean): Promise<void> => {
     await client.setStore('autostart', autostart);
   },
+  getDiagnosticsEnabled: async (): Promise<boolean> => {
+    return (await client.getStore('diagnosticsEnabled')) ?? false;
+  },
+  saveDiagnosticsEnabled: async (diagnosticsEnabled: boolean): Promise<void> => {
+    await client.setStore('diagnosticsEnabled', diagnosticsEnabled);
+  },
   importConfig: async (): Promise<boolean> => {
     return client.importConfig();
   },
