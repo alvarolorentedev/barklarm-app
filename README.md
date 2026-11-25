@@ -129,13 +129,18 @@ You need [Bun](https://bun.sh) 1.4+ and the [Rust toolchain](https://rustup.rs).
 
 ```sh
 bun install
-bun run dev        # Vite + Tauri dev; opens the settings window
-bun run test       # unit tests
-bun run tsc:check  # type check
+bun run dev        # native Tauri app; opens the settings window
+bun run dev:mock   # real React app in a browser with deterministic data
+bun run check      # format, lint, types, tests, coverage, renderer build
+bun run test:e2e   # Playwright acceptance tests against the mock runtime
 bun run build      # Tauri app and dmg, output in src-tauri/target/release/bundle/
 ```
 
+Browser development needs no credentials, native dependencies or external services. Mock scenarios are selected with `?scenario=empty|healthy|failed-builds|running-builds|unavailable|multiple-failures|persistence`.
+
 Development builds show the settings window immediately so the UI can be inspected. Production builds start in the tray.
+
+See [AGENTS.md](AGENTS.md) for the repository guide, [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution flow and [docs/engineering/DEVELOPMENT.md](docs/engineering/DEVELOPMENT.md) for detailed commands.
 
 The promo video is a separate Remotion project:
 
