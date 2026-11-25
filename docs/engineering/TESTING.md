@@ -31,7 +31,7 @@ Run a single file with `bunx vitest run src/core/observer-manager.test.ts`. Run 
 ## Coverage
 
 Verified baseline at Phase 0 completion: 80.3% lines/statements, 88.8% branches, 81.3% functions across `src/**` (core:
-95.5% lines/statements, 94.0% branches, 90.9% functions). Phase 1 verified: 87.42% lines/statements, 87.43% branches,
+95.5% lines/statements, 94.0% branches, 90.9% functions). Phase 1 verified: 87.42% lines/statements, 87.45% branches,
 85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Gates in `vitest.config.ts`:
 
 - overall: 78% lines, statements and functions; 86% branches;
