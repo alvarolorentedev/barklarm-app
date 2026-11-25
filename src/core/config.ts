@@ -52,6 +52,6 @@ export function normalizeObservables(value: unknown): ObserverConfiguration[] {
 }
 
 export function normalizeConfig(value: unknown): BarklarmConfig {
-  const source = value && typeof value === 'object' ? (value as BarklarmConfig) : {};
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as BarklarmConfig) : {};
   return { ...DEFAULT_CONFIG, ...source, observables: normalizeObservables(source.observables) };
 }

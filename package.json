@@ -27,7 +27,7 @@
     "rust:fmt": "cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
     "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml",
-    "audit": "bun audit --production",
+    "audit": "bun audit --production --audit-level=high",
     "tsc:check": "tsc --noEmit --skipLibCheck",
     "lint:check": "eslint src e2e playwright.config.ts --ext .ts,.tsx --max-warnings=0",
     "lint:fix": "eslint src e2e playwright.config.ts --ext .ts,.tsx --fix",

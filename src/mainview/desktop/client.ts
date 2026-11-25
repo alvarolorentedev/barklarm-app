@@ -37,7 +37,7 @@ async function loadConfig(): Promise<BarklarmConfig> {
   const stored = await invoke<unknown>('load_config');
   config = normalizeConfig(stored);
   const storedObservables = (stored as BarklarmConfig | null)?.observables;
-  if (storedObservables !== undefined && JSON.stringify(storedObservables) !== JSON.stringify(config.observables)) {
+  if (Array.isArray(storedObservables) && JSON.stringify(storedObservables) !== JSON.stringify(config.observables)) {
     // Persist legacy IDs so imports and exports keep stable observer identity.
     await saveConfig();
   }
