@@ -127,7 +127,7 @@ Rollback is deleting the new setting and UI; evidence is memory-only, so no data
 
 ## Validation evidence
 
-Recorded on the Phase 1 branch:
+Recorded on the Phase 1 mainline commits:
 
 ```text
 bun install --frozen-lockfile   no changes (681 installs, 660 packages)
