@@ -106,6 +106,24 @@ test('explains unsupported integrations and disabled collection', async ({ page 
   );
 });
 
+test('keeps evidence independent for simultaneous failures', async ({ page }) => {
+  await page.goto('/?scenario=diagnostics-multiple&reset=1');
+  await expect(page.locator('.status-pill.failure')).toHaveCount(2);
+
+  await page.locator('.observer-row-main').nth(0).click();
+  await expect(page.getByRole('region', { name: 'Diagnostic evidence' }).locator('.diagnostics-status')).toHaveText(
+    'Complete'
+  );
+  await expect(
+    page.getByRole('region', { name: 'Diagnostic evidence' }).getByRole('heading', { name: 'Job: build' })
+  ).toBeVisible();
+
+  await page.locator('.observer-row-main').nth(1).click();
+  const second = page.getByRole('region', { name: 'Diagnostic evidence' });
+  await expect(second.locator('.diagnostics-status')).toHaveText('Complete');
+  await expect(second.getByRole('heading', { name: 'Job: web-build' })).toBeVisible();
+});
+
 test('never shows raw synthetic credentials in evidence', async ({ page }) => {
   await page.goto('/?scenario=diagnostics-secrets&reset=1');
   await expandFirstObserver(page);
