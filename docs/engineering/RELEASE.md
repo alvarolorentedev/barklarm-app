@@ -24,7 +24,8 @@ The release workflow triggers on tags matching `v*`.
    - Linux x64 (`ubuntu-24.04`)
    - Linux arm64 (`ubuntu-24.04-arm`)
    - Windows x64 (`windows-latest`)
-6. The release job downloads bundles and publishes the GitHub release with generated notes. Bundles include only the
+6. The release job downloads bundles and creates a **draft** GitHub release with generated notes. A human reviews the
+   draft, the native smoke evidence and the Phase 4 qualification checklist before publishing. Bundles include only the
    runtime binary, shared libraries and upstream license files; model weights are never bundled and are downloaded by
    the user on demand.
 7. Before a tag, run the manual `Release candidate validation` workflow. It builds and uploads the five target bundles
@@ -73,6 +74,7 @@ These are recommendations; this repository does not modify them automatically.
 - Protect release tags (`v*`) from updates and deletion.
 - Keep Dependabot alerts and security updates enabled.
 - Do not grant workflows write access beyond the release job.
+- Keep tag releases as drafts until native interactive validation and the release qualification checklist are complete.
 
 ## Rollback
 
