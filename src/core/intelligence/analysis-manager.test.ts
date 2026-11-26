@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DiagnosticEvidence } from '../../types/Diagnostics';
 import {
   InferenceError,
@@ -65,6 +65,7 @@ class FakeProvider implements InferenceProvider {
   responses: Array<string | Error>;
   delayMs = 0;
   tokenCount?: number;
+  tokenizeImpl?: (text: string) => number;
   tokenizeError?: Error;
 
   constructor(responses: Array<string | Error> = [validAnalysis()]) {
@@ -96,8 +97,9 @@ class FakeProvider implements InferenceProvider {
     return { text: next, model: this.model };
   }
 
-  async tokenize(): Promise<number> {
+  async tokenize(text: string): Promise<number> {
     if (this.tokenizeError) throw this.tokenizeError;
+    if (this.tokenizeImpl) return this.tokenizeImpl(text);
     return this.tokenCount ?? 0;
   }
 
@@ -331,12 +333,23 @@ describe('analysis manager', () => {
 
   it('uses the tokenizer to reduce an oversized context', async () => {
     const provider = new FakeProvider();
-    provider.tokenCount = 100000;
+    provider.tokenizeImpl = (text) => Math.ceil(text.length / 2);
     const manager = managerFor(provider);
     manager.ingest(evidence());
     await manager.waitForIdle();
     expect(provider.calls).toBe(1);
     expect(provider.requests[0].messages[1].content.length).toBeLessThan(20000);
+    manager.shutdown();
+  });
+
+  it('rejects a prompt that cannot fit even after deterministic reduction', async () => {
+    const provider = new FakeProvider();
+    provider.tokenCount = 100000;
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(0);
+    expect(manager.getSnapshot('observer-1')).toEqual({ status: 'failed', reason: 'invalid_response' });
     manager.shutdown();
   });
 
@@ -579,5 +592,188 @@ describe('analysis manager', () => {
     await manager.waitForIdle();
     manager.shutdown();
     expect(manager.getSnapshot('observer-1').status).toBe('disabled');
+  });
+
+  it('prunes expired evidence and analysis without a UI snapshot request', async () => {
+    let now = new Date('2026-01-15T12:00:00.000Z');
+    const provider = new FakeProvider();
+    const manager = managerFor(provider, { now: () => now, limits: { cacheTtlMs: 1000 } });
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1').status).toBe('available');
+
+    now = new Date('2026-01-15T12:00:02.000Z');
+    manager.prune();
+    expect(manager.getSnapshot('observer-1')).toEqual({ status: 'waiting_for_evidence' });
+    manager.shutdown();
+  });
+
+  it('clears cached analysis when diagnostics are disabled', async () => {
+    const provider = new FakeProvider([validAnalysis(), validAnalysis()]);
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(1);
+
+    manager.setDiagnosticsEnabled(false);
+    manager.setDiagnosticsEnabled(true);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(2);
+    manager.shutdown();
+  });
+
+  it('never exposes the previous failure analysis while a new failure is queued', async () => {
+    const provider = new FakeProvider([validAnalysis('error:1'), validAnalysis('error:2')]);
+    provider.delayMs = 5;
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1').status).toBe('available');
+
+    const next = evidence({
+      failureId: 'run-2:1',
+      items: [{ id: 'error:2', category: 'error', title: 'Error 2', content: 'different failure' }],
+    });
+    manager.ingest(next);
+    const snapshot = manager.getSnapshot('observer-1');
+    expect(snapshot.status).not.toBe('available');
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1').analysis?.failureId).toBe('run-2:1');
+    manager.shutdown();
+  });
+
+  it('recovers work that overflowed the queue once capacity is available', async () => {
+    const provider = new FakeProvider();
+    provider.delayMs = 5;
+    const manager = managerFor(provider, { limits: { concurrency: 1, maxQueue: 1 } });
+    manager.ingest(evidence());
+    manager.ingest(evidence({ observerId: 'observer-2', failureId: 'run-2:1' }));
+    manager.ingest(evidence({ observerId: 'observer-3', failureId: 'run-3:1' }));
+    expect(manager.getSnapshot('observer-3')).toEqual({ status: 'failed', reason: 'queue_full' });
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(3);
+    expect(manager.getSnapshot('observer-3').status).toBe('available');
+    manager.shutdown();
+  });
+
+  it('preserves an explicit analysis reason from the provider', async () => {
+    const provider = new FakeProvider([new InferenceError('unavailable', 'native', 'model_missing')]);
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1')).toEqual({
+      status: 'runtime_unavailable',
+      reason: 'model_missing',
+    });
+    manager.shutdown();
+  });
+
+  it('disposes a provider that resolves after its generation was superseded', async () => {
+    const stale = new FakeProvider();
+    const dispose = vi.fn();
+    stale.dispose = dispose;
+    const fresh = new FakeProvider();
+    let resolveStale: (provider: InferenceProvider) => void = () => undefined;
+    const pendingProvider = new Promise<InferenceProvider>((resolve) => {
+      resolveStale = resolve;
+    });
+    let created = 0;
+    const manager = managerFor(fresh, {
+      createProvider: () => {
+        created += 1;
+        return created === 1 ? pendingProvider : fresh;
+      },
+    });
+    manager.ingest(evidence());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    manager.setConfig('custom', {
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'fake-model',
+      contextWindow: 4096,
+      maxOutputTokens: 256,
+      timeoutMs: 5000,
+    });
+    resolveStale(stale);
+    await manager.waitForIdle();
+    expect(dispose).toHaveBeenCalled();
+    expect(manager.getSnapshot('observer-1').status).toBe('available');
+    manager.shutdown();
+  });
+
+  it('re-runs blocked analysis when a first-run condition resolves', async () => {
+    const provider = new FakeProvider([new InferenceError('unavailable', 'native', 'model_missing'), validAnalysis()]);
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1')).toEqual({
+      status: 'runtime_unavailable',
+      reason: 'model_missing',
+    });
+
+    manager.retryBlocked(true);
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(2);
+    expect(manager.getSnapshot('observer-1').status).toBe('available');
+    manager.shutdown();
+  });
+
+  it('does not automatically re-send evidence to a failing remote provider', async () => {
+    const provider = new FakeProvider([new InferenceError('unavailable')]);
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    manager.retryBlocked(true);
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(1);
+    manager.shutdown();
+  });
+
+  it('invalidates an in-flight run when its evidence is already stale', async () => {
+    let now = new Date('2026-01-15T12:00:00.000Z');
+    const provider = new FakeProvider();
+    provider.delayMs = 10;
+    const manager = managerFor(provider, { now: () => now, limits: { cacheTtlMs: 1000 } });
+    manager.ingest(evidence());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    now = new Date('2026-01-15T12:00:02.000Z');
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1')).toEqual({
+      status: 'waiting_for_evidence',
+      reason: 'no_evidence',
+    });
+    manager.shutdown();
+  });
+
+  it('rate-limits retry attempts so status polling cannot loop', async () => {
+    const provider = new FakeProvider([new InferenceError('unavailable', 'native', 'model_missing')]);
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(1);
+
+    manager.retryBlocked(true);
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(2);
+    manager.retryBlocked();
+    await manager.waitForIdle();
+    expect(provider.calls).toBe(2);
+    manager.shutdown();
+  });
+
+  it('keeps only the latest execution when reanalysis supersedes an active run', async () => {
+    const first = { ...JSON.parse(validAnalysis()), summary: 'first execution' };
+    const second = { ...JSON.parse(validAnalysis()), summary: 'second execution' };
+    const provider = new FakeProvider([JSON.stringify(first), JSON.stringify(second)]);
+    provider.delayMs = 10;
+    const manager = managerFor(provider);
+    manager.ingest(evidence());
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    manager.reanalyze('observer-1');
+    expect(manager.getSnapshot('observer-1').status).toBe('queued');
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('observer-1').analysis?.summary).toBe('second execution');
+    manager.shutdown();
   });
 });

@@ -55,6 +55,7 @@ export const client: AppRPCClient = {
   deleteProviderKey: (fingerprint) => call((runtime) => runtime.deleteProviderKey(fingerprint)),
   isDestinationApproved: (fingerprint) => call((runtime) => runtime.isDestinationApproved(fingerprint)),
   approveDestination: (fingerprint) => call((runtime) => runtime.approveDestination(fingerprint)),
+  revokeDestination: (fingerprint) => call((runtime) => runtime.revokeDestination(fingerprint)),
   testInferenceProvider: (input) => call((runtime) => runtime.testInferenceProvider(input)),
   openExternal: (url) => call((runtime) => runtime.openExternal(url)),
   importConfig: () => call((runtime) => runtime.importConfig()),

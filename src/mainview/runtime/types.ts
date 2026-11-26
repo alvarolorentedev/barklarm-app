@@ -28,6 +28,7 @@ export type AppRPCClient = {
   deleteProviderKey(fingerprint?: string): Promise<void>;
   isDestinationApproved(fingerprint: string): Promise<boolean>;
   approveDestination(fingerprint: string): Promise<void>;
+  revokeDestination(fingerprint: string): Promise<void>;
   testInferenceProvider(input: ProviderTestInput): Promise<ProviderTestResult>;
   openExternal(url: string): Promise<boolean>;
   importConfig(): Promise<boolean>;

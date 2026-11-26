@@ -208,4 +208,49 @@ describe('analysis validator', () => {
     expect(validate('x'.repeat(21000)).ok).toBe(false);
     expect(validate([]).ok).toBe(false);
   });
+
+  it('requires uncertainty before presenting limited evidence conclusively', () => {
+    const result = validate({ ...valid, evidenceSufficiency: 'limited', uncertainty: [] });
+    expect(result.ok).toBe(false);
+    if (result.ok === true) return;
+    expect((result as { ok: false; errors: string[] }).errors).toContain('limited_supported_without_uncertainty');
+
+    expect(
+      validate({
+        ...valid,
+        evidenceSufficiency: 'limited',
+        uncertainty: ['The dependency is not identified.'],
+      }).ok
+    ).toBe(true);
+  });
+
+  it('rejects secrets hidden behind JSON escaping or control characters', () => {
+    const escaped = JSON.stringify(valid).replace(
+      'The build failed while compiling.',
+      'token ghp_\\u0041BCDEFGHIJKLMNOPQRSTUVWXYZ123456'
+    );
+    const result = validateAnalysis(escaped, input);
+    expect(result.ok).toBe(false);
+    if (result.ok === true) return;
+    expect((result as { ok: false; errors: string[] }).errors).toContain('sensitive_output');
+
+    const controlled = validate({
+      ...valid,
+      summary: 'token ghp_\u0000ABCDEFGHIJKLMNOPQRSTUVWXYZ123456',
+    });
+    expect(controlled.ok).toBe(false);
+    if (controlled.ok === true) return;
+    expect((controlled as { ok: false; errors: string[] }).errors).toContain('sensitive_output');
+  });
+
+  it('rejects destructive commands hidden behind JSON escaping', () => {
+    const escaped = JSON.stringify(valid).replace(
+      'Inspect the reported type at the cited line.',
+      'Run rm\\u0020-rf / to clean the workspace.'
+    );
+    const result = validateAnalysis(escaped, input);
+    expect(result.ok).toBe(false);
+    if (result.ok === true) return;
+    expect((result as { ok: false; errors: string[] }).errors).toContain('unsafe_output');
+  });
 });

@@ -239,7 +239,14 @@ export type HardwareReport = {
   availableMemoryBytes: number;
   freeDiskBytes: number;
   cpuCount: number;
+  platformRecognized: boolean;
+  runtimeArtifactAvailable: boolean;
+  hardwareRequirementsMet: boolean;
+  modelInstalled: boolean;
+  runtimeOperational: boolean;
+  releaseQualified: boolean;
   managedRuntimeSupported: boolean;
+  managedInferenceAvailable: boolean;
   reason?: string;
 };
 

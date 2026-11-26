@@ -23,9 +23,13 @@ import { isHttpUrl } from '../../core/issue';
 import { NotificationManager } from '../../core/notification';
 import { ObserverManager, ObserverPresenter } from '../../core/observer-manager';
 import { AnalysisManager } from '../../core/intelligence/analysis-manager';
+import { effectiveBudget } from '../../core/intelligence/context-assembler';
 import { destinationFingerprint, validateEndpoint } from '../../core/intelligence/endpoint-policy';
-import { ManagedInferenceProvider } from '../../core/intelligence/providers/managed';
-import { OpenAICompatibleProvider } from '../../core/intelligence/providers/openai-compatible';
+import {
+  createCustomInferenceProvider,
+  createManagedInferenceProvider,
+} from '../../core/intelligence/providers/factory';
+import { createInferenceFetch, createObserverFetch } from '../../core/intelligence/transport';
 import { setFetchImplementation } from '../../extensions/fetch-adapter';
 import {
   InferenceError,
@@ -50,6 +54,7 @@ let evidence: EvidenceManager | null = null;
 let analysis: AnalysisManager | null = null;
 let tray: TrayPresenter | null = null;
 let readyPromise: Promise<void> | null = null;
+let maintenanceTimer: ReturnType<typeof setInterval> | null = null;
 
 function emptyModel(): ModelInfo {
   return {
@@ -150,7 +155,9 @@ async function getProviderKey(fingerprint?: string): Promise<string | undefined>
     const value = await invoke<string | null>('get_provider_key', { fingerprint: fingerprint || '' });
     return typeof value === 'string' && value ? value : undefined;
   } catch {
-    return undefined;
+    // A locked/unavailable credential store must not silently send an
+    // unauthenticated request to a remote destination.
+    throw new InferenceError('configuration', 'credential_store_unavailable');
   }
 }
 
@@ -162,49 +169,60 @@ async function isDestinationApproved(fingerprint: string): Promise<boolean> {
   }
 }
 
-function inferenceFetch(url: string, options: any): Promise<any> {
-  return tauriFetch(url, {
-    ...(options || {}),
-    ...(config.sslDisabled ? { danger: { acceptInvalidCerts: true, acceptInvalidHostnames: true } } : {}),
-  } as any);
-}
+// Inference never inherits the observer SSL compatibility switch and never
+// falls back to browser fetch, which the production CSP blocks.
+const inferenceFetch = createInferenceFetch((url, options) => tauriFetch(url, options as any));
 
 async function createAnalysisProvider(request: {
   mode: ReturnType<typeof normalizeIntelligenceMode>;
   provider?: ReturnType<typeof normalizeIntelligenceProvider>;
 }) {
   const providerConfig = normalizeIntelligenceProvider(request.provider);
+  const budget = effectiveBudget(providerConfig.contextWindow, providerConfig.maxOutputTokens);
   if (request.mode === 'managed') {
-    return new ManagedInferenceProvider(
+    return createManagedInferenceProvider(
       {
         ensure: async (_signal, contextWindow) =>
-          invoke<ManagedRuntimeEndpoint>('ensure_managed_runtime', { contextWindow: contextWindow ?? null }),
+          invoke<ManagedRuntimeEndpoint>('ensure_managed_runtime', {
+            contextWindow: effectiveBudget(
+              contextWindow ?? providerConfig.contextWindow,
+              providerConfig.maxOutputTokens
+            ).contextWindow,
+          }),
+        beginInference: async () => {
+          await invoke('begin_managed_inference');
+        },
+        endInference: async () => {
+          await invoke('end_managed_inference').catch(() => undefined);
+        },
       },
       {
         timeoutMs: providerConfig.timeoutMs,
-        contextWindow: providerConfig.contextWindow,
-        maxOutputTokens: providerConfig.maxOutputTokens,
-      }
+        contextWindow: budget.contextWindow,
+        maxOutputTokens: budget.maxOutputTokens,
+      },
+      inferenceFetch
     );
   }
 
   const validation = validateEndpoint(providerConfig.endpoint);
   if (validation.ok === false) throw new InferenceError('configuration', validation.reason);
   if (!providerConfig.model) throw new InferenceError('configuration', 'model_missing');
-  const fingerprint = destinationFingerprint(validation.baseUrl, providerConfig.model);
+  const fingerprint = await destinationFingerprint(validation.baseUrl, providerConfig.model);
   if (validation.requiresConsent && !(await isDestinationApproved(fingerprint))) {
     throw new InferenceError('consent_required');
   }
-  return new OpenAICompatibleProvider({
-    name: 'Custom OpenAI-compatible provider',
-    endpoint: validation.baseUrl,
-    model: providerConfig.model,
-    apiKey: await getProviderKey(fingerprint),
-    contextWindow: providerConfig.contextWindow,
-    maxOutputTokens: providerConfig.maxOutputTokens,
-    timeoutMs: providerConfig.timeoutMs,
-    fetch: inferenceFetch,
-  });
+  return createCustomInferenceProvider(
+    validation.baseUrl,
+    providerConfig.model,
+    await getProviderKey(fingerprint),
+    {
+      contextWindow: budget.contextWindow,
+      maxOutputTokens: budget.maxOutputTokens,
+      timeoutMs: providerConfig.timeoutMs,
+    },
+    inferenceFetch
+  );
 }
 
 async function intelligenceStatus(): Promise<IntelligenceStatus> {
@@ -226,7 +244,7 @@ async function intelligenceStatus(): Promise<IntelligenceStatus> {
       destination = validation.baseUrl;
       consentRequired = validation.requiresConsent;
       destinationApproved = consentRequired
-        ? await isDestinationApproved(destinationFingerprint(validation.baseUrl, provider.model || ''))
+        ? await isDestinationApproved(await destinationFingerprint(validation.baseUrl, provider.model || ''))
         : true;
     }
   }
@@ -235,12 +253,16 @@ async function intelligenceStatus(): Promise<IntelligenceStatus> {
   try {
     providerKeyPresent = Boolean(
       await invoke<boolean>('has_provider_key', {
-        fingerprint: destination ? destinationFingerprint(destination, provider.model || '') : '',
+        fingerprint: destination ? await destinationFingerprint(destination, provider.model || '') : '',
       })
     );
   } catch {
     providerKeyPresent = false;
   }
+
+  // A resolved first-run blocker (installed model, restarted runtime) should
+  // not require the user to restart or recollect unchanged evidence.
+  analysis?.retryBlocked();
 
   return {
     mode,
@@ -259,7 +281,14 @@ async function intelligenceStatus(): Promise<IntelligenceStatus> {
       availableMemoryBytes: 0,
       freeDiskBytes: 0,
       cpuCount: 0,
+      platformRecognized: false,
+      runtimeArtifactAvailable: false,
+      hardwareRequirementsMet: false,
+      modelInstalled: false,
+      runtimeOperational: false,
+      releaseQualified: false,
       managedRuntimeSupported: false,
+      managedInferenceAvailable: false,
       reason: 'status_unavailable',
     },
     providerConfigured: mode === 'custom' && Boolean(provider.endpoint && provider.model),
@@ -274,19 +303,18 @@ async function testInferenceProvider(input: ProviderTestInput): Promise<Provider
   const validation = validateEndpoint(input.endpoint);
   if (validation.ok === false) return { ok: false, error: 'configuration' };
   if (validation.requiresConsent) {
-    const fingerprint = destinationFingerprint(validation.baseUrl, input.model);
+    const fingerprint = await destinationFingerprint(validation.baseUrl, input.model);
     if (!(await isDestinationApproved(fingerprint))) return { ok: false, error: 'consent_required' };
   }
   try {
-    const fingerprint = destinationFingerprint(validation.baseUrl, input.model);
-    const provider = new OpenAICompatibleProvider({
-      name: 'Custom OpenAI-compatible provider',
-      endpoint: validation.baseUrl,
-      model: input.model,
-      apiKey: await getProviderKey(fingerprint),
-      timeoutMs: input.timeoutMs,
-      fetch: inferenceFetch,
-    });
+    const fingerprint = await destinationFingerprint(validation.baseUrl, input.model);
+    const provider = createCustomInferenceProvider(
+      validation.baseUrl,
+      input.model,
+      await getProviderKey(fingerprint),
+      { timeoutMs: input.timeoutMs },
+      inferenceFetch
+    );
     await provider.initialize();
     return await provider.testConnection();
   } catch (error) {
@@ -300,11 +328,11 @@ async function initialize(): Promise<void> {
     initializeI18n((navigator.language || 'en').slice(0, 2).toLowerCase());
     await loadConfig();
 
-    setFetchImplementation((url, options) =>
-      tauriFetch(url, {
-        ...(options || {}),
-        ...(config.sslDisabled ? { danger: { acceptInvalidCerts: true, acceptInvalidHostnames: true } } : {}),
-      } as any)
+    setFetchImplementation(
+      createObserverFetch(
+        (url, options) => tauriFetch(url, options as any),
+        () => Boolean(config.sslDisabled)
+      )
     );
 
     const notifications = new NotificationManager((title, body) => {
@@ -337,6 +365,10 @@ async function initialize(): Promise<void> {
         else analysis?.clearAll();
       },
     });
+    maintenanceTimer = setInterval(() => {
+      evidence?.prune();
+      analysis?.prune();
+    }, 60_000);
     manager = new ObserverManager(tray || noopPresenter, notifications, undefined, evidence);
     manager.start(normalizeRefreshInterval(config.refreshInterval));
     await manager.refreshObservers(config.observables || []);
@@ -489,6 +521,14 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
     async approveDestination(fingerprint: string): Promise<void> {
       await ready();
       await invoke('approve_destination', { fingerprint });
+      analysis?.refreshProvider();
+      analysis?.retryBlocked(true);
+    },
+
+    async revokeDestination(fingerprint: string): Promise<void> {
+      await ready();
+      await invoke('revoke_destination', { fingerprint });
+      analysis?.refreshProvider();
     },
 
     testInferenceProvider,
@@ -504,6 +544,8 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
     exportConfig,
 
     async quit(): Promise<boolean> {
+      if (maintenanceTimer) clearInterval(maintenanceTimer);
+      maintenanceTimer = null;
       analysis?.shutdown();
       manager?.destroy();
       await invoke('stop_managed_runtime').catch(() => undefined);

@@ -69,7 +69,7 @@ export class EvidenceManager {
   private sources = new Map<string, DiagnosticObserverSource>();
   private cache = new Map<string, CachedEvidence>();
   private seen = new Map<string, { key: string; at: number }>();
-  private failed = new Map<string, string>();
+  private failed = new Map<string, { key: string; at: number }>();
   private pending = new Map<string, PendingCollection>();
   private queue: QueueItem[] = [];
   private lastStates: State[] = [];
@@ -172,20 +172,53 @@ export class EvidenceManager {
         return { status: statusFor(cached.evidence), evidence: cloneEvidence(cached.evidence) };
       }
       this.cache.delete(observerId);
+      this.seen.delete(observerId);
+      this.emit({ type: 'cleared', observerId });
     }
-    if (this.failed.get(observerId) === key) return { status: 'failed' };
+    if (this.failedWithinTtl(observerId, key)) return { status: 'failed' };
     return { status: 'not_collected' };
   }
 
   /** Bounded snapshot used when intelligence is enabled after evidence exists. */
   getAvailableEvidence(): DiagnosticEvidence[] {
     if (!this.enabled || this.stopped) return [];
+    this.prune();
     const output: DiagnosticEvidence[] = [];
     for (const cached of this.cache.values()) {
       if (this.expired(cached)) continue;
       output.push(cloneEvidence(cached.evidence));
     }
     return output;
+  }
+
+  /**
+   * Retention is owned here, not by whichever snapshot the UI happens to ask
+   * for. Clearing an expired envelope also invalidates its analysis.
+   */
+  prune(): void {
+    if (this.stopped) return;
+    const now = this.now().getTime();
+    for (const [observerId, cached] of Array.from(this.cache.entries())) {
+      if (now - cached.collectedAt > this.limits.cacheTtlMs) {
+        this.cache.delete(observerId);
+        this.seen.delete(observerId);
+        this.emit({ type: 'cleared', observerId });
+      }
+    }
+    for (const [observerId, seen] of Array.from(this.seen.entries())) {
+      if (now - seen.at > this.limits.cacheTtlMs) this.seen.delete(observerId);
+    }
+    for (const [observerId, failed] of Array.from(this.failed.entries())) {
+      if (now - failed.at > this.limits.cacheTtlMs) this.failed.delete(observerId);
+    }
+  }
+
+  private failedWithinTtl(observerId: string, key: string): boolean {
+    const failed = this.failed.get(observerId);
+    if (!failed || failed.key !== key) return false;
+    if (this.now().getTime() - failed.at <= this.limits.cacheTtlMs) return true;
+    this.failed.delete(observerId);
+    return false;
   }
 
   recollect(observerId: string): void {
@@ -198,6 +231,7 @@ export class EvidenceManager {
     this.cache.delete(observerId);
     this.seen.delete(observerId);
     this.failed.delete(observerId);
+    this.emit({ type: 'cleared', observerId });
     this.enqueue({
       source,
       key,
@@ -251,7 +285,7 @@ export class EvidenceManager {
       if (cached.key === key && !this.expired(cached)) return;
       this.cache.delete(source.id);
     }
-    if (this.failed.get(source.id) === key) return;
+    if (this.failedWithinTtl(source.id, key)) return;
     const seen = this.seen.get(source.id);
     if (seen?.key === key && this.now().getTime() - seen.at <= this.limits.cacheTtlMs) return;
 
@@ -292,7 +326,7 @@ export class EvidenceManager {
             !this.stopped &&
             this.lastFailures.get(item.source.id)?.error?.id === item.failure.failureId
           ) {
-            this.failed.set(item.source.id, item.key);
+            this.failed.set(item.source.id, { key: item.key, at: this.now().getTime() });
           }
         })
         .finally(() => {
@@ -330,7 +364,7 @@ export class EvidenceManager {
         // Keep the failure marker so a broken source is not retried on every
         // refresh. A new failure or an explicit recollection clears it.
         if (this.enabled && !this.stopped && this.lastFailures.get(source.id)?.error?.id === item.failure.failureId) {
-          this.failed.set(source.id, item.key);
+          this.failed.set(source.id, { key: item.key, at: this.now().getTime() });
         }
         return;
       }
@@ -394,6 +428,9 @@ export class EvidenceManager {
       }
       if (!oldestId) return;
       this.cache.delete(oldestId);
+      // Keep the seen marker so eviction cannot cause a collection storm; the
+      // TTL prune is the only thing that allows another attempt.
+      this.emit({ type: 'cleared', observerId: oldestId });
     }
   }
 
