@@ -116,12 +116,24 @@ pub fn save_config(app: AppHandle, config: Value) -> Result<(), String> {
     write_value(&app, &config)
 }
 
+/// Imported configuration is data, not consent. Disable intelligence in the
+/// same write so a crash cannot leave an imported mode active.
+fn disable_imported_intelligence(value: &mut Value) {
+    if let Some(object) = value.as_object_mut() {
+        object.insert(
+            "intelligenceMode".to_string(),
+            Value::String("disabled".to_string()),
+        );
+    }
+}
+
 #[tauri::command]
 pub fn import_config(app: AppHandle, path: String) -> Result<bool, String> {
-    let value = match read_json_object(Path::new(&path)) {
+    let mut value = match read_json_object(Path::new(&path)) {
         Some(value) => value,
         None => return Ok(false),
     };
+    disable_imported_intelligence(&mut value);
     write_value(&app, &value)?;
     Ok(true)
 }
@@ -150,6 +162,20 @@ mod tests {
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("barklarm-{name}-{suffix}.json"))
+    }
+
+    #[test]
+    fn imported_configuration_cannot_enable_inference() {
+        let mut value = serde_json::json!({
+            "intelligenceMode": "custom",
+            "intelligenceProvider": { "endpoint": "https://example.test/v1" }
+        });
+        disable_imported_intelligence(&mut value);
+        assert_eq!(value["intelligenceMode"], "disabled");
+        assert_eq!(
+            value["intelligenceProvider"]["endpoint"],
+            "https://example.test/v1"
+        );
     }
 
     #[test]

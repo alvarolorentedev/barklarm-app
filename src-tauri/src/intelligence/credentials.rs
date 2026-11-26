@@ -19,7 +19,8 @@ pub fn get_provider_key(fingerprint: &str) -> Result<Option<String>, String> {
     match entry(&provider_user(fingerprint))?.get_password() {
         Ok(value) if !value.is_empty() => Ok(Some(value)),
         Ok(_) => Ok(None),
-        Err(_) => Ok(None),
+        Err(keyring::Error::NoEntry) => Ok(None),
+        Err(_) => Err("credential_store_unavailable".to_string()),
     }
 }
 
@@ -33,8 +34,11 @@ pub fn set_provider_key(value: &str, fingerprint: &str) -> Result<(), String> {
 }
 
 pub fn delete_provider_key(fingerprint: &str) -> Result<(), String> {
-    let _ = entry(&provider_user(fingerprint))?.delete_credential();
-    Ok(())
+    match entry(&provider_user(fingerprint))?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("credential_store_unavailable".to_string()),
+    }
 }
 
 pub fn has_provider_key(fingerprint: &str) -> bool {
@@ -59,4 +63,15 @@ pub fn approve_destination(fingerprint: &str) -> Result<(), String> {
     entry(&consent_user(fingerprint))?
         .set_password("approved")
         .map_err(|_| "credential_store_unavailable".to_string())
+}
+
+pub fn revoke_destination(fingerprint: &str) -> Result<(), String> {
+    if fingerprint.is_empty() || fingerprint.len() > 200 {
+        return Err("fingerprint_invalid".to_string());
+    }
+    match entry(&consent_user(fingerprint))?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(keyring::Error::NoEntry) => Ok(()),
+        Err(_) => Err("credential_store_unavailable".to_string()),
+    }
 }
