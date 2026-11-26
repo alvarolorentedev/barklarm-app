@@ -12,6 +12,10 @@ concurrency:
 
 env:
   BUN_VERSION: '1.4.5'
+  # The llama.cpp runtime is shipped as a resource next to its libraries and
+  # launched with LD_LIBRARY_PATH. linuxdeploy cannot see that directory while
+  # bundling and fails on the unresolved sidecar dependencies.
+  LINUXDEPLOY_EXCLUDED_LIBRARIES: 'libllama*;libggml*;libmtmd*'
 
 # Manual, non-publishing build. It proves native compilation, sidecar staging,
 # packaging and artifact production. It does not download a model and does not
