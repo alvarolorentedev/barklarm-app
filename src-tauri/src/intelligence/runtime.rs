@@ -321,7 +321,7 @@ fn process_identity(pid: u32) -> Option<String> {
     {
         use sysinfo::{Pid, ProcessesToUpdate, System};
         let target = Pid::from_u32(pid);
-        let mut system = System::new();
+        let mut system = System::new().ok()?;
         system.refresh_processes(ProcessesToUpdate::Some(&[target]), true);
         if let Some(process) = system.process(target) {
             let executable = process
@@ -851,7 +851,6 @@ impl RuntimeState {
             set_process_env(&mut command, app, &binary);
             #[cfg(windows)]
             {
-                use std::os::windows::process::CommandExt;
                 command.creation_flags(0x08000000);
             }
 
