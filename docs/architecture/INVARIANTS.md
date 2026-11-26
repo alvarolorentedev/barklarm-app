@@ -36,6 +36,9 @@ explicit approval.
 
 Do not merge these into one mutable object. Do not build incident management.
 
+Presentation is a fourth, derived view: it may combine the three contracts for display, but it owns no lifecycle,
+persistence or outbound payload. The tray overlay and the full Radiator render the same projection.
+
 ## Data boundaries
 
 - Configuration is user data and may contain credentials. Do not log, export implicitly, or transmit it.

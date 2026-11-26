@@ -27,7 +27,7 @@ vi.mock('../../rpc-client', () => ({
 vi.mock('../../../extensions/observersTitleBuilderMap', () => ({
   __esModule: true,
   observersTitleBuilderMap: {
-    githubAction: vi.fn((observable: any) => `Github: ${observable.alias}`),
+    githubAction: vi.fn((observable: any) => `GitHub: ${observable.alias}`),
   },
 }));
 
@@ -56,16 +56,16 @@ describe('Observers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (observersTitleBuilderMap as any).githubAction.mockImplementation(
-      (observable: any) => `Github: ${observable.alias}`
+      (observable: any) => `GitHub: ${observable.alias}`
     );
   });
 
   it('renders rows with type and live status', () => {
     renderObservers([{ type: 'githubAction', alias: 'build' }], [{ name: 'build', status: Status.SUCCESS, link: '' }]);
 
-    expect(screen.getByText('Github: build')).toBeInTheDocument();
-    expect(screen.getByText('Github Action')).toBeInTheDocument();
-    expect(screen.getByText('Succeeded')).toBeInTheDocument();
+    expect(screen.getByText('GitHub: build')).toBeInTheDocument();
+    expect(screen.getByText('GitHub Actions')).toBeInTheDocument();
+    expect(screen.getByText('Healthy')).toBeInTheDocument();
   });
 
   it('renders the empty state and adds a new observer', () => {
@@ -107,8 +107,8 @@ describe('Observers', () => {
       'alpha'
     );
 
-    expect(screen.getByText('Github: alpha')).toBeInTheDocument();
-    expect(screen.queryByText('Github: beta')).not.toBeInTheDocument();
+    expect(screen.getByText('GitHub: alpha')).toBeInTheDocument();
+    expect(screen.queryByText('GitHub: beta')).not.toBeInTheDocument();
   });
 
   it('shows the diagnostic panel for an expanded failed observer', async () => {

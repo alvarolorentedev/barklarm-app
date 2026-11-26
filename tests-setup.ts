@@ -24,6 +24,10 @@ class ResizeObserverMock {
 
 (globalThis as any).ResizeObserver = ResizeObserverMock;
 
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => undefined;
+}
+
 if (!window.matchMedia) {
   (window as any).matchMedia = () => ({
     matches: false,

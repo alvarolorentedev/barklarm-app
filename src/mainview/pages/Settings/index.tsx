@@ -7,7 +7,7 @@ import { translate } from '../../i18n';
 import { storage } from './helpers/storage';
 import { IntelligenceSettings } from './Intelligence';
 
-export const General = () => {
+export const Settings = () => {
   const [sslDisabled, setSslDisabled] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(60000);
   const [issueGlobalEndpoint, setIssueGlobalEndpoint] = useState('');
@@ -29,6 +29,12 @@ export const General = () => {
     exportConfig,
     quit,
   } = storage();
+
+  useEffect(() => {
+    if (window.location.hash.includes('#intelligence')) {
+      requestAnimationFrame(() => document.getElementById('intelligence')?.scrollIntoView({ block: 'start' }));
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -58,8 +64,8 @@ export const General = () => {
   return (
     <div className="page">
       <PageHeader
-        title={translate('General')}
-        description="Configure how Barklarm refreshes, starts, and stores its data."
+        title={translate('Settings')}
+        description={translate('Configure monitoring, diagnosis, and application behavior.')}
       />
 
       <SettingsGroup title={translate('Monitoring')}>
@@ -95,11 +101,7 @@ export const General = () => {
         </SettingsRow>
       </SettingsGroup>
 
-      <SettingsGroup title={translate('Intelligence')}>
-        <IntelligenceSettings />
-      </SettingsGroup>
-
-      <SettingsGroup title={translate('Diagnostics')}>
+      <SettingsGroup title={translate('Diagnostics')} id="diagnostics">
         <SettingsRow
           label={translate('Diagnostic evidence')}
           description={translate(
@@ -116,6 +118,10 @@ export const General = () => {
             }}
           />
         </SettingsRow>
+      </SettingsGroup>
+
+      <SettingsGroup title={translate('Intelligence')} id="intelligence">
+        <IntelligenceSettings />
       </SettingsGroup>
 
       <SettingsGroup title={translate('Startup')}>

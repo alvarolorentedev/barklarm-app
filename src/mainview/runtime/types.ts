@@ -30,6 +30,11 @@ export type AppRPCClient = {
   approveDestination(fingerprint: string): Promise<void>;
   revokeDestination(fingerprint: string): Promise<void>;
   testInferenceProvider(input: ProviderTestInput): Promise<ProviderTestResult>;
+  writeClipboard(text: string): Promise<boolean>;
+  openIssue(observerId: string): Promise<boolean>;
+  openMainWindow(): Promise<void>;
+  hideWindow(): Promise<void>;
+  setTrayPanelHeight(height: number): Promise<void>;
   openExternal(url: string): Promise<boolean>;
   importConfig(): Promise<boolean>;
   exportConfig(): Promise<boolean>;

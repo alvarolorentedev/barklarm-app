@@ -14,6 +14,7 @@ compiles; it is complete when the relevant checks prove the required behavior.
 | Extension components      | `src/extensions/<name>/component/*.test.tsx` | Testing Library              |
 | Mainview pages/components | `src/mainview/**/*.test.tsx`                 | Testing Library              |
 | Browser acceptance        | `e2e/*.spec.ts`                              | Playwright + mock runtime    |
+| Visual capture            | `scripts/capture-phase3.ts`                  | Playwright + mock runtime    |
 | Native                    | `src-tauri/src/**` `#[cfg(test)]`            | cargo test                   |
 | Diagnostic evaluation     | `scripts/evals/` + `fixtures/ai-eval/`       | bun run test:evals:mock      |
 | Real-model evaluation     | `scripts/evals/` + local provider            | bun run test:evals:local     |
@@ -40,7 +41,9 @@ Run a single file with `bunx vitest run src/core/observer-manager.test.ts`. Run 
 Phase 0 baseline: 80.3% lines/statements, 88.8% branches, 81.3% functions. Phase 1: 87.3% lines/statements, 87.43%
 branches, 85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Phase 2: 86.91%
 lines/statements, 86.05% branches, 87.09% functions overall. Phase 2.1: 86.83% lines/statements, 86.06% branches, 87.12%
-functions overall; all gates pass. The new code is covered by focused intelligence/lifecycle tests, not exclusions. Gates in `vitest.config.ts`:
+functions overall. Phase 3: 87.48% lines/statements, 86.05% branches, 80.59% functions overall; `src/core/**` is 95.42%
+lines/statements, 89.44% branches and 94.87% functions. All gates pass. The new code is covered by focused projection,
+handoff, component and route tests, not exclusions. Gates in `vitest.config.ts`:
 
 - overall: 78% lines, statements and functions; 86% branches;
 - `src/core/**`: 90% lines, statements and functions; 85% branches.
@@ -70,8 +73,12 @@ Priority areas for new work:
    retention/pruning, first-run retry and managed provider lifecycle.
 9. **Native runtime/download** — serialized startup, stop during start, ownership identity, token permissions, manifest
    records, full-hash activation, same-size replacement, cache/download guards.
-10. **Browser journeys** — startup, navigation, configuration edit, reload persistence, failure and unavailable
-    presentation, diagnostic settings and evidence states, all intelligence scenarios.
+10. **Radiator and handoff** — counts, NA/muted/ordering, stale identity rejection, deterministic prompt composition,
+    credential redaction, malicious instructions, size limits, clipboard success/failure and stale analysis.
+11. **Tray overlay** — compact healthy/empty/attention states, overlay detail/handoff routes, content-height reporting
+    and single-surface navigation. Escape is unit-tested; native focus-loss/blur remains Phase 4 work.
+12. **Browser journeys** — 36 Playwright tests covering the original startup/configuration/diagnostics/intelligence
+    journeys plus the new radiator, tray, citation, handoff, activation, recovery and resolution journeys.
 
 
 ## Unit conventions
@@ -92,6 +99,15 @@ Priority areas for new work:
 - Reload/persistence tests must not use `reset=1` on the first navigation, because the reset also runs after reload. A
   fresh Playwright context starts with empty storage.
 - Failures keep screenshots, traces and error context in `test-results/`; CI uploads them.
+
+## Phase 3 native validation
+
+Native interactive validation is recorded separately from browser tests. On this macOS arm64 machine the release bundle
+builds, launches, stays resident in the menu bar and has no on-screen app window at launch. Screen capture and tray
+click automation were unavailable to the agent environment, so the overlay click, clipboard write and full-app
+transition could not be exercised interactively here. Rust placement tests, the native build and the full browser suite
+are green; the unexecuted native interactions are carried into Phase 4. Do not cite the browser mock as proof of native
+window or clipboard behaviour.
 
 ## Native tests
 

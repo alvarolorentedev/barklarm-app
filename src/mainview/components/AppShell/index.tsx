@@ -7,7 +7,7 @@ import { useSearch } from '../../search-context';
 import { useStatus } from '../../status-context';
 
 const STATUS_LABEL: Record<Status, string> = {
-  [Status.SUCCESS]: 'Succeeded',
+  [Status.SUCCESS]: 'Healthy',
   [Status.FAILURE]: 'Failed',
   [Status.CHECKING]: 'Checking',
   [Status.NA]: 'Unavailable',
@@ -60,7 +60,7 @@ export const AppShell = ({ routes, children }: AppShellProps) => {
           <nav className="nav">
             {routes.map((route) => {
               const Icon = route.icon;
-              const isActive = location.pathname === route.path;
+              const isActive = location.pathname === route.path || location.pathname.startsWith(`${route.path}/`);
               return (
                 <button
                   key={route.path}

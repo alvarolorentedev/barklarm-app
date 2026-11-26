@@ -50,6 +50,7 @@ proposing a new boundary; add one when a consequential decision changes.
 | `bun run test:e2e`                               | Playwright smoke and acceptance tests against the mock runtime                          |
 | `bun run test:evals:mock`                        | Deterministic diagnostic evaluations without a model                                    |
 | `bun run test:evals:local`                       | Explicit real-model evaluation; never part of standard CI                               |
+| `bun run capture:phase3`                         | Capture synthetic Radiator/tray screenshots while `dev:mock` is running                 |
 | `bun run sidecar:fetch`                          | Fetch and verify the pinned llama.cpp runtime for the current target                    |
 | `bun run sidecar:smoke`                          | Lightweight binary-availability check                                                   |
 | `bun run sidecar:smoke:runtime`                  | Opt-in real runtime: hash, loopback, auth, inference, validation and cleanup             |
@@ -63,10 +64,10 @@ also require the Rust commands. Never weaken a check to make it pass.
 ## Repository map
 
 ```text
-src/core/              Application behavior: config, observers, notifications, evidence, intelligence
+src/core/              Application behavior: config, observers, notifications, evidence, intelligence, presentation, handoff
 src/core/intelligence/ Context assembly, prompt, validation, provider adapters, analysis lifecycle
 src/extensions/<name>/ One integration: type, observer (I/O), optional diagnostics provider, component, tests
-src/mainview/          React presentation, pages, contexts, desktop shell and runtime facade
+src/mainview/          React presentation, Radiator, tray overlay, pages, contexts, desktop shell and runtime facade
 src/mainview/runtime/  Browser mock runtime and shared client contract
 src/mainview/desktop/  Tauri-only shell: tray, dialogs, notifications, autostart, store bridge
 src/types/             Shared contracts (State, Observer, configuration, status, Diagnostics, Intelligence)
@@ -85,6 +86,10 @@ scripts/               Deterministic repository checks
 - **Intelligence** owns context assembly, prompts, provider execution and validated interpretation. It never changes
   operational status or evidence.
 - **React** owns presentation and interaction. Components do not import Tauri APIs.
+- **Radiator presentation** is a read-only projection of state, evidence and analysis. The tray overlay is the same
+  renderer/window in a compact mode; it never creates a second observer, evidence or analysis owner.
+- **Agent handoff** is deterministic and local. It separates trusted instructions from untrusted evidence and copies
+  only on explicit user action through the runtime abstraction.
 - **Tauri/Rust** owns native capabilities, the config file, model files, credentials and runtime processes. Only
   `src/mainview/desktop/**` and the runtime facade may import `@tauri-apps/*`; ESLint enforces this.
 - **Mock runtime** implements the same `AppRPCClient` interface as the desktop runtime. It must never import Tauri

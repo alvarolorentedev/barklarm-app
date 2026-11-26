@@ -2,11 +2,12 @@ import React from 'react';
 
 type SettingsGroupProps = {
   title?: string;
+  id?: string;
   children: React.ReactNode;
 };
 
-export const SettingsGroup = ({ title, children }: SettingsGroupProps) => (
-  <section className="settings-group">
+export const SettingsGroup = ({ title, id, children }: SettingsGroupProps) => (
+  <section className="settings-group" id={id}>
     {title ? <h2 className="settings-group-title">{title}</h2> : null}
     <div className="settings-group-body">{children}</div>
   </section>

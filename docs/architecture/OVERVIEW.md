@@ -10,13 +10,14 @@ Native (bun run dev / packaged app)
     -> rpc-client facade (dynamic runtime selection)
        -> desktop/client -> ObserverManager -> extensions/<name>/observer -> fetch-adapter -> Tauri HTTP
                           -> NotificationManager -> Tauri notification plugin
-                          -> TrayPresenter -> Tauri tray/menu APIs
+                          -> TrayPresenter -> Tauri tray APIs -> one compact overlay window mode
                           -> Tauri invoke -> src-tauri/src/store.rs -> config.json
        -> desktop/client -> EvidenceManager -> extensions/<name>/diagnostics -> fetch-adapter -> Tauri HTTP
                           -> AnalysisManager -> context/prompt/validator -> managed or custom provider
                              -> Tauri HTTP transport (inference TLS isolated from observer sslDisabled)
                           -> Tauri invoke -> serialized runtime lifecycle, verified model store, credentials
-  StrictMode + HashRouter; tray remains the primary surface when the window is closed.
+  StrictMode + HashRouter; the tray overlay is the primary surface. The full window is a second mode of the same
+  renderer, so there is one ObserverManager, EvidenceManager and AnalysisManager.
 
 Browser mock (bun run dev:mock)
   React (same components and pages)
@@ -71,6 +72,23 @@ contains a separate `client.js` chunk but no mock code.
 Each integration ships four parts: `type` (configuration shape), `observer` (I/O and state), `component` (form), and
 registrations in `observerBuiderMap`, `observersComponentBuilderMap`, `observersTitleBuilderMap` and `observersList`.
 New integrations follow that shape; they do not add switches to core.
+
+## Phase 3 presentation and handoff
+
+- The default full-window route is `/radiator`; `/radiator/observer/:id` is the failure detail, `/observers` and
+  `/settings` remain. `/general` redirects to `/settings`.
+- Clicking the tray icon toggles one compact overlay (`/tray`, `/tray/observer/:id`, `/tray/handoff/:id`). It is the
+  same hidden main window in tray mode, resized to 380 px and content-sized between 200 and 520 px. This avoids a
+  second renderer and duplicate polling, evidence collection or inference.
+- `useRadiatorData` is the single read-only snapshot coordinator for the overlay/full failure list. It discards stale
+  results by observer/failure identity and polls only transient states. It never schedules collection or analysis.
+- `src/core/presentation/radiator.ts` derives counts, deterministic ordering and health state from existing contracts.
+- `src/core/handoff.ts` composes a deterministic, sanitized, bounded prompt. Trusted instructions and untrusted
+  evidence are separated; stale analysis is never included. The desktop runtime exposes clipboard writes behind
+  `AppRPCClient`; React never imports Tauri.
+- The overlay has Settings/Quit/Open issue/Open source actions, so there is no second native menu view on macOS or
+  Windows. Linux keeps a minimal native-menu fallback because Tauri does not emit tray click events there.
+- The tray icon and operational colours remain derived from `State` only; analysis never changes them.
 
 ## State contract
 

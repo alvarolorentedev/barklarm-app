@@ -10,6 +10,7 @@ via [../../SECURITY.md](../../SECURITY.md), not a public issue.
 - The local config file and explicit exports.
 - The user's machine, through native capabilities and arbitrary HTTP(S) access.
 - Diagnostic evidence, model prompts, model output, API keys and managed model/runtime artifacts.
+- The user's clipboard content produced by agent handoff.
 
 ## Trust boundaries
 
@@ -148,6 +149,32 @@ Residual risks:
 | Resource exhaustion | Queue/concurrency limits, normalized context/output budgets, full request deadlines, one runtime slot, active-inference protection, idle shutdown | A model can still use significant CPU/memory while active |
 | Untrusted imported configuration | Normalization, consent outside config, no auto-download/auto-inference | Invalid custom endpoints fail closed |
 
+## Agent handoff and clipboard
+
+- Handoff composition is local, deterministic and model-free. It includes one observer's failure, sanitized evidence,
+  validated analysis and, when safe, the source URL. It excludes configuration, integration credentials, provider keys,
+  runtime tokens, unrelated observers and unvalidated model output.
+- The composer reuses the diagnostic sanitizer, rejects stale observer/failure identities, separates trusted
+  instructions from a delimited untrusted-evidence block, neutralizes reserved delimiter markers inside untrusted fields
+  and applies deterministic item/character limits. Pattern-based redaction remains a safety net, not a guarantee.
+- The prompt is rendered as text in a preview. Copying happens only on an explicit user action through
+  `AppRPCClient.writeClipboard`; there is no automatic transmission, agent launch or clipboard read. The desktop
+  implementation uses the narrow native `clipboard-manager:allow-write-text` capability and leaves the preview
+  selectable if the write fails. No clipboard-read permission is granted.
+- The UI states whether AI interpretation is included and warns that pasting elsewhere may send the content to another
+  tool or provider.
+- Evidence containing instructions is never promoted to trusted instructions. Malicious or embedded commands remain
+  data and are covered by regression tests.
+
+## Tray overlay
+
+- The overlay is the existing hidden main window in a borderless tray mode. It uses existing observer/evidence/analysis
+  owners; it does not create a second runtime.
+- The native window commands only change size, decorations, focus, always-on-top and taskbar visibility. They add no
+  filesystem, network or credential capability.
+- Linux does not emit Tauri tray click events; a minimal native menu is the documented fallback. The overlay is not
+  claimed to work there.
+
 ## Content security policy
 
 The Tauri CSP is now set to `default-src 'self'`, `script-src 'self'`, `style-src 'self' 'unsafe-inline'`, self/data
@@ -207,3 +234,4 @@ test the migration.
 - [ ] Model output is validated, rendered as text and never executed; citations are subset-checked.
 - [ ] Log redirects and external links cannot carry credentials or execute remote content.
 - [ ] New native permission is least-privilege and documented.
+- [ ] Handoff excludes configuration, credentials and stale analysis; clipboard writes are explicit and previewed.

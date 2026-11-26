@@ -79,7 +79,7 @@ describe('DiagnosticPanel', () => {
     mockClient.getDiagnosticEvidence.mockResolvedValue({ status: 'disabled' });
     render(<DiagnosticPanel observerId="observer-1" />);
 
-    expect(await screen.findByText('Diagnostics are disabled. Enable them in General settings.')).toBeInTheDocument();
+    expect(await screen.findByText('Diagnostics are disabled. Enable them in Settings.')).toBeInTheDocument();
   });
 
   it('shows the unsupported explanation', async () => {
@@ -136,6 +136,6 @@ describe('DiagnosticPanel', () => {
     fireEvent.click(
       within(screen.getByRole('region', { name: 'Diagnostic evidence' })).getByRole('button', { name: 'Retry' })
     );
-    expect(await screen.findByText('Diagnostics are disabled. Enable them in General settings.')).toBeInTheDocument();
+    expect(await screen.findByText('Diagnostics are disabled. Enable them in Settings.')).toBeInTheDocument();
   });
 });

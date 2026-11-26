@@ -4,7 +4,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { General } from './index';
+import { Settings } from './index';
 import { expect, describe, it, vi } from 'vitest';
 
 vi.mock('../../rpc-client', () => ({
@@ -75,11 +75,11 @@ vi.mock('./helpers/storage', () => ({
   }),
 }));
 
-describe('General', () => {
+describe('Settings', () => {
   it('renders the native settings groups', async () => {
-    render(<General />);
+    render(<Settings />);
 
-    expect(screen.getByText('General')).toBeInTheDocument();
+    expect(screen.getByText('Settings')).toBeInTheDocument();
     expect(screen.getByText('Monitoring')).toBeInTheDocument();
     expect(screen.getByLabelText('Refresh interval')).toHaveValue(1);
     expect(screen.getByRole('switch', { name: 'Diagnostic evidence' })).not.toBeChecked();
@@ -91,7 +91,7 @@ describe('General', () => {
   });
 
   it('toggles diagnostic collection locally', async () => {
-    render(<General />);
+    render(<Settings />);
     const toggle = screen.getByRole('switch', { name: 'Diagnostic evidence' });
     await screen.findByText('Diagnostics');
 

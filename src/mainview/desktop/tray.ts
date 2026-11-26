@@ -2,6 +2,7 @@ import { TrayIcon } from '@tauri-apps/api/tray';
 import { Menu, PredefinedMenuItem, Submenu } from '@tauri-apps/api/menu';
 import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
+import { Image as TauriImage } from '@tauri-apps/api/image';
 import { Status } from '../../types/Status';
 import { State } from '../../types/State';
 import { translate } from '../../core/i18n';
@@ -14,7 +15,7 @@ import failIconUrl from '../../assets/fail_icon_big.png';
 import runningIconUrl from '../../assets/running_icon_big.png';
 import naIconUrl from '../../assets/na_icon_big.png';
 
-type IconBytes = Record<Status, Uint8Array>;
+type IconBytes = Record<Status, TauriImage>;
 
 // Used only when AppKit is known not to draw menu item images.
 const STATUS_PREFIX: Record<Status, string> = {
@@ -24,13 +25,34 @@ const STATUS_PREFIX: Record<Status, string> = {
   [Status.NA]: '?',
 };
 
-async function loadIcon(url: string): Promise<Uint8Array> {
-  const response = await fetch(url);
-  return new Uint8Array(await response.arrayBuffer());
+const linux = typeof navigator !== 'undefined' && navigator.userAgent.includes('Linux');
+
+async function loadIcon(url: string): Promise<TauriImage> {
+  // Decode through the image pipeline instead of fetch: small icons are inlined
+  // as data URLs, and the production CSP intentionally does not allow connect-src data:.
+  const image = new Image();
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error('tray icon could not be decoded'));
+    image.src = url;
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('tray icon canvas is unavailable');
+  context.drawImage(image, 0, 0);
+  const data = context.getImageData(0, 0, canvas.width, canvas.height);
+  return TauriImage.new(new Uint8Array(data.data), canvas.width, canvas.height);
+}
+
+export function openRoute(route: string): void {
+  window.location.hash = `#${route}`;
+  void invoke('show_window');
 }
 
 function showConfigureWindow(): void {
-  void invoke('show_window');
+  openRoute('/radiator');
 }
 
 export function openExternal(url: string): void {
@@ -43,13 +65,47 @@ export function openExternal(url: string): void {
   }
 }
 
-function openIssue(state: State, endpoint: string): void {
+export function openIssue(state: State, endpoint: string): void {
   if (!isHttpUrl(endpoint)) return;
   void fetchWrapper(endpoint, {
     method: 'POST',
     body: JSON.stringify(buildIssuePayload(state)),
     headers: { 'Content-Type': 'application/json' },
   }).catch((error) => console.error('Failed to open issue:', error));
+}
+
+function openFailure(state: State): void {
+  if (!state.id) return;
+  openRoute(`/radiator/observer/${encodeURIComponent(state.id)}`);
+}
+
+async function toggleTrayPanel(event: {
+  rect?: { position: { x: number; y: number }; size: { width: number; height: number } };
+}): Promise<void> {
+  try {
+    const mode = await invoke<string>('get_window_mode');
+    if (mode === 'tray') {
+      await invoke('hide_window');
+      return;
+    }
+    if (mode === 'main') {
+      await invoke('show_window');
+      return;
+    }
+    if (!event.rect) return;
+    window.location.hash = '#/tray';
+    await invoke('show_tray_panel', {
+      x: event.rect.position.x,
+      y: event.rect.position.y,
+      width: event.rect.size.width,
+      height: event.rect.size.height,
+    });
+  } catch (error) {
+    // A window-position failure must never leave the user without a surface.
+    console.error('Tray panel failed, opening the main window:', error);
+    window.location.hash = '#/radiator';
+    await invoke('show_window').catch(() => undefined);
+  }
 }
 
 export async function setupAppMenu(): Promise<void> {
@@ -117,15 +173,20 @@ export class TrayPresenter implements ObserverPresenter {
     presenter.endpoint = endpoint;
 
     try {
-      const menu = await presenter.buildMenu(initialStates);
+      const menu = linux ? await presenter.buildMenu(initialStates) : undefined;
       presenter.tray = await TrayIcon.new({
         icon: presenter.icons[Status.NA],
         iconAsTemplate: false,
-        showMenuOnLeftClick: true,
+        showMenuOnLeftClick: linux,
         menu,
         tooltip: 'Barklarm',
+        action: (event) => {
+          if (event.type !== 'Click') return;
+          if ('buttonState' in event && event.buttonState !== 'Up') return;
+          void toggleTrayPanel(event).catch((error) => console.error('Tray toggle failed:', error));
+        },
       });
-      presenter.menu = menu;
+      presenter.menu = menu ?? null;
       return presenter;
     } catch (error) {
       console.error('Failed to create tray:', error);
@@ -147,6 +208,7 @@ export class TrayPresenter implements ObserverPresenter {
 
   updateMenu(states: State[]): void {
     this.states = states;
+    if (!linux) return;
     this.enqueue(async () => {
       if (!this.tray) return;
       const menu = await this.buildMenu(states);
@@ -162,16 +224,21 @@ export class TrayPresenter implements ObserverPresenter {
   }
 
   private async buildMenu(states: State[]): Promise<Menu> {
-    const items: Array<Submenu | PredefinedMenuItem | { text: string; action: () => void }> = [];
+    const items: Array<Submenu | PredefinedMenuItem | { text: string; action: () => void }> = [
+      { text: translate('Open Radiator'), action: showConfigureWindow },
+      await PredefinedMenuItem.new({ item: 'Separator' }),
+    ];
 
     for (const state of states) {
-      const submenuItems: Array<{ text: string; action: () => void }> = [
-        { text: translate('Link'), action: () => openExternal(state.link) },
-      ];
+      const submenuItems: Array<{ text: string; action: () => void }> = [];
+      if (state.status === Status.FAILURE && state.id) {
+        submenuItems.push({ text: translate('Investigate failure'), action: () => openFailure(state) });
+      }
+      submenuItems.push({ text: translate('Link'), action: () => openExternal(state.link) });
       const endpoint = state.issueEndpoint || this.endpoint;
       if (state.status === Status.FAILURE && endpoint) {
         submenuItems.push({
-          text: translate('Open Issue'),
+          text: translate('Open issue'),
           action: () => openIssue(state, endpoint),
         });
       }
@@ -185,7 +252,7 @@ export class TrayPresenter implements ObserverPresenter {
     }
 
     items.push(await PredefinedMenuItem.new({ item: 'Separator' }));
-    items.push({ text: translate('Configure'), action: showConfigureWindow });
+    items.push({ text: translate('Open Barklarm'), action: showConfigureWindow });
     items.push({ text: translate('Quit'), action: () => void invoke('quit_app') });
 
     return Menu.new({ items });

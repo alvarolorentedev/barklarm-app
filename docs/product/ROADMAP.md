@@ -59,15 +59,41 @@ Goal: make Phase 2 reliable, secure, bounded and demonstrably functional before 
 
 See [spec 0003](../specs/0003-intelligence-hardening.md).
 
-## Phase 3 — Evaluated assistance
+## Phase 3 — Intelligent radiator experience (implemented; native interactive qualification partial)
 
-Goal: ship diagnosis only when evaluations show it is correct, grounded and safe.
+Goal: make the tray the first surface and the full window the detailed surface.
 
-- Offline and opt-in evaluation runs; no real models in standard CI.
-- Human review of failures and regressions.
-- Measured diagnostic correctness, actionability and hallucination resistance.
+- [x] One tray overlay toggled by a tray click; no separate right-click menu design on macOS/Windows.
+- [x] Compact operational summary, prioritized failures, diagnosis and next action in the overlay.
+- [x] Full Radiator page, failure detail, evidence citations and agent handoff.
+- [x] Deterministic, sanitized, size-bounded coding-agent prompt with preview and explicit clipboard copy.
+- [x] Contextual diagnostics and built-in intelligence activation without a wizard or restart.
+- [x] Light/dark tokens, compact layouts, English/Spanish and accessible focus behaviour.
+- [x] Deterministic mock scenarios and browser acceptance tests for the new experience.
+- [ ] Interactive native validation on every released platform; macOS arm64 is recorded, other targets remain Phase 4 work.
 
-Not started.
+See [spec 0004](../specs/0004-intelligent-radiator-experience.md).
+
+## Phase 4 — Release qualification
+
+Goal: qualify the frozen 4.0 experience on every released platform.
+
+- Interactive native smoke on macOS, Windows and Linux; tray overlay, focus/blur, CSP, clipboard, citations,
+  intelligence disablement and runtime cleanup.
+- Signed/notarized release candidates and the remaining platform matrix work.
+- Screen-reader, high-load and large-evidence checks.
+- Correct platform qualification claims and close accepted risks or document the residual.
+- Real-model evaluation evidence for the release candidate.
+
+## Phase 5 — Product launch
+
+Goal: publish the release and the public product story.
+
+- README, website, screenshots, marketing, SEO and launch materials.
+- Release notes and public communication.
+- Post-launch feedback and support.
+
+Functional scope is frozen after Phase 3. Later phases qualify and launch the experience; they do not add features.
 
 ## Explicit non-goals
 

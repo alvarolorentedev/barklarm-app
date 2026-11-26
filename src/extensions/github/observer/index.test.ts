@@ -110,7 +110,7 @@ describe('Github Action', () => {
     config.alias = undefined;
     observer = new GithubAction(config);
     const result = await observer.getState();
-    expect(result.name).toBe(`Github: ${config.owner}/${config.repo}/${config.workflowId}`);
+    expect(result.name).toBe(`GitHub: ${config.owner}/${config.repo}/${config.workflowId}`);
   });
 
   it('exposes a diagnostic provider and a source-based scope', () => {

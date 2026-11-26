@@ -2,13 +2,18 @@ import { expect, test, type Page } from '@playwright/test';
 
 const PERSISTENCE_KEY = 'barklarm.mock.v1.diagnostics-disabled';
 
+async function openObservers(page: Page) {
+  await page.getByRole('button', { name: 'Observers', exact: true }).click();
+}
+
 async function expandFirstObserver(page: Page) {
+  await openObservers(page);
   await page.locator('.observer-row-main').first().click();
 }
 
 test('persists the diagnostic collection setting', async ({ page }) => {
   await page.goto('/?scenario=diagnostics-disabled');
-  await page.getByRole('button', { name: 'General' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
   const toggle = page.getByRole('switch', { name: 'Diagnostic evidence' });
   await expect(toggle).not.toBeChecked();
@@ -20,11 +25,13 @@ test('persists the diagnostic collection setting', async ({ page }) => {
     .toContain('"diagnosticsEnabled":true');
 
   await page.reload();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Diagnostic evidence' })).toBeChecked();
 });
 
 test('presents complete evidence with safe source links', async ({ page }) => {
   await page.goto('/?scenario=diagnostics-complete&reset=1');
+  await openObservers(page);
   await expect(page.locator('.observer-item')).toHaveCount(2);
 
   await expandFirstObserver(page);
@@ -91,16 +98,16 @@ test('explains unsupported integrations and disabled collection', async ({ page 
   await page.goto('/?scenario=diagnostics-disabled&reset=1');
   await expandFirstObserver(page);
   const panel = page.getByRole('region', { name: 'Diagnostic evidence' });
-  await expect(panel.getByText('Diagnostics are disabled. Enable them in General settings.')).toBeVisible();
+  await expect(panel.getByText('Diagnostics are disabled. Enable them in Settings.')).toBeVisible();
 
-  await page.getByRole('button', { name: 'General' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('switch', { name: 'Diagnostic evidence' }).check({ force: true });
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('barklarm.mock.v1.diagnostics-disabled')))
     .toContain('"diagnosticsEnabled":true');
 
-  await page.getByRole('button', { name: 'Observers' }).click();
-  await expandFirstObserver(page);
+  await openObservers(page);
+  await page.locator('.observer-row-main').first().click();
   await expect(page.getByRole('region', { name: 'Diagnostic evidence' }).locator('.diagnostics-status')).toHaveText(
     'Complete'
   );
@@ -108,7 +115,8 @@ test('explains unsupported integrations and disabled collection', async ({ page 
 
 test('keeps evidence independent for simultaneous failures', async ({ page }) => {
   await page.goto('/?scenario=diagnostics-multiple&reset=1');
-  await expect(page.locator('.status-pill.failure')).toHaveCount(2);
+  await openObservers(page);
+  await expect(page.locator('.observer-item .status-pill.failure')).toHaveCount(2);
 
   await page.locator('.observer-row-main').nth(0).click();
   await expect(page.getByRole('region', { name: 'Diagnostic evidence' }).locator('.diagnostics-status')).toHaveText(

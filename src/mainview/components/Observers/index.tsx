@@ -3,6 +3,7 @@ import { ChevronRight, Plus } from 'lucide-react';
 import { observersComponentBuilderMap } from '../../../extensions/observersComponentBuilderMap';
 import { observersTitleBuilderMap } from '../../../extensions/observersTitleBuilderMap';
 import { observersList } from '../../../extensions/observersList';
+import { supportsDiagnostics } from '../radiator/integration';
 import { ObserversParams } from '../../../types/ObserversParams';
 import { State } from '../../../types/State';
 import { Status } from '../../../types/Status';
@@ -67,6 +68,11 @@ export const Observers = ({
     setExpanded(observables.length);
   };
 
+  const addSource = (type: string) => {
+    add({ type });
+    setExpanded(observables.length);
+  };
+
   const removeObserver = (index: number) => {
     remove(index);
     setExpanded(null);
@@ -83,9 +89,48 @@ export const Observers = ({
         </div>
 
         {observables.length === 0 ? (
-          <div className="observer-empty">
-            <strong>{translate('No observers yet')}</strong>
-            <span>{translate('Add your first source to start monitoring.')}</span>
+          <div className="observer-first-run">
+            <div className="observer-empty">
+              <strong>{translate('No observers yet')}</strong>
+              <span>{translate('Add your first source to start monitoring.')}</span>
+            </div>
+            <div className="observer-first-run-options">
+              <div className="observer-first-run-recommended">
+                <div>
+                  <span className="observer-first-run-label">{translate('Recommended first source')}</span>
+                  <strong>GitHub Actions</strong>
+                  <span className="observer-diagnostic-badge">{translate('Detailed diagnosis')}</span>
+                  <p>
+                    {translate(
+                      'Read-only access to Actions for one repository. Supports failed jobs, steps and bounded log evidence.'
+                    )}
+                  </p>
+                </div>
+                <button type="button" className="button primary" onClick={() => addSource('githubAction')}>
+                  {translate('Add GitHub Actions')}
+                </button>
+              </div>
+              <div className="observer-first-run-other">
+                <span className="observer-first-run-label">{translate('Or choose another source')}</span>
+                <div className="observer-first-run-grid">
+                  {observersList
+                    .filter((item: any) => item.value !== 'githubAction')
+                    .map((item: any) => (
+                      <button
+                        type="button"
+                        key={item.value}
+                        className="observer-source-button"
+                        onClick={() => addSource(item.value)}
+                      >
+                        {item.label}
+                        {supportsDiagnostics(item.value) ? (
+                          <span className="observer-diagnostic-badge">{translate('Detailed diagnosis')}</span>
+                        ) : null}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
           </div>
         ) : visible.length === 0 ? (
           <div className="observer-empty">

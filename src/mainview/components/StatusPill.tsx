@@ -3,7 +3,7 @@ import { Status } from '../../types/Status';
 import { translate } from '../i18n';
 
 const STATUS_META: Record<Status, { className: string; label: string }> = {
-  [Status.SUCCESS]: { className: 'success', label: 'Succeeded' },
+  [Status.SUCCESS]: { className: 'success', label: 'Healthy' },
   [Status.FAILURE]: { className: 'failure', label: 'Failed' },
   [Status.CHECKING]: { className: 'checking', label: 'Checking' },
   [Status.NA]: { className: 'idle', label: 'Unavailable' },

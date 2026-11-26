@@ -27,7 +27,7 @@ export class NotificationManager {
 
       const titleMap: Record<Status, string> = {
         [Status.FAILURE]: translate('Failed'),
-        [Status.SUCCESS]: translate('Succeeded'),
+        [Status.SUCCESS]: translate('Healthy'),
         [Status.CHECKING]: translate('Checking'),
         [Status.NA]: translate('Unaccesible'),
       };

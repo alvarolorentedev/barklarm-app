@@ -10,6 +10,18 @@ keep the tray icon, menu and notifications in sync. Configuration and credential
 ship today: GitHub Actions, Azure DevOps, Bitbucket, CCTray, Datadog, Sentry, New Relic, Opsgenie, Grafana and Graylog.
 Phase 1 adds opt-in, bounded diagnostic evidence for GitHub Actions failures. Phase 2 adds optional local intelligence:
 a managed llama.cpp runtime or a user-configured OpenAI-compatible provider, with cited and validated explanations.
+Phase 3 adds a compact tray overlay, a full Radiator page, failure detail with evidence citations and a deterministic
+coding-agent handoff.
+
+## Phase 3: the radiator experience
+
+Barklarm 4.0 puts the radiator first. Clicking the menu-bar icon opens a compact overlay with operational health,
+prioritized failures, the likely cause when a validated analysis exists, the next useful action and a deterministic
+coding-agent handoff. The full window remains the detailed surface for evidence, citations, observers and settings.
+
+The overlay is one tray surface, not a left-click view plus a separate right-click menu design. Linux keeps a native
+menu fallback because Tauri cannot emit tray click events there. AI never changes operational status, colours or the
+tray icon.
 
 ## Direction
 
@@ -40,6 +52,12 @@ evaluation. Evidence is opt-in and memory-only. No inference or model runtime is
 Optional, local-first diagnosis: deterministic evidence context, a versioned prompt, strict validation, a managed
 llama.cpp runtime, verified on-demand GGUF downloads, a custom OpenAI-compatible provider, explicit remote consent and a
 separate analysis panel. Intelligence is disabled by default and never changes operational status.
+
+## Phase 3 scope
+
+The intelligent radiator: one compact tray overlay, a full Radiator page, failure detail with evidence citations,
+deterministic agent handoff, contextual activation and accessible light/dark presentation. No new evidence engine,
+analysis manager, integration, model or cloud service.
 
 ## Non-goals
 

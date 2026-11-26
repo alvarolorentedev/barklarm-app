@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function expandFirstObserver(page: Page) {
+  await page.getByRole('button', { name: 'Observers', exact: true }).click();
   await page.locator('.observer-row-main').first().click();
 }
 
@@ -45,7 +46,7 @@ test('shows insufficient evidence without inventing a diagnosis', async ({ page 
 
 test('shows the model download, progress and cancellation', async ({ page }) => {
   await page.goto('/?scenario=intelligence-downloading&reset=1');
-  await page.getByRole('button', { name: 'General' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
   const group = page.getByRole('region', { name: 'Intelligence' });
   await expect(group.getByText('Qwen3 1.7B Instruct (Q4_K_M)')).toBeVisible();
@@ -57,7 +58,7 @@ test('shows the model download, progress and cancellation', async ({ page }) => 
 
 test('requires explicit remote-destination consent', async ({ page }) => {
   await page.goto('/?scenario=intelligence-remote-consent&reset=1');
-  await page.getByRole('button', { name: 'General' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
   const group = page.getByRole('region', { name: 'Intelligence' });
   await expect(group.getByText('https://inference.example.test/v1')).toBeVisible();
@@ -68,12 +69,12 @@ test('requires explicit remote-destination consent', async ({ page }) => {
 
 test('explains unsupported managed hardware and keeps monitoring usable', async ({ page }) => {
   await page.goto('/?scenario=intelligence-unsupported-hardware&reset=1');
-  await page.getByRole('button', { name: 'General' }).click();
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
 
   const group = page.getByRole('region', { name: 'Intelligence' });
   await expect(group.getByText(/Managed inference is unavailable on this computer/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Observers' }).click();
+  await page.getByRole('button', { name: 'Observers', exact: true }).click();
   await expandFirstObserver(page);
   await expect(
     page

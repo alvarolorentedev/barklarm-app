@@ -3,8 +3,8 @@ import { expect, describe, it } from 'vitest';
 
 describe('observersComponentBuilderMap', () => {
   describe.each([
-    ['githubAction', { alias: 'awesome alias' }, 'Github: awesome alias'],
-    ['githubAction', { owner: 'owner', repo: 'repo', workflowId: 'workflowId' }, 'Github: owner/repo/workflowId'],
+    ['githubAction', { alias: 'awesome alias' }, 'GitHub: awesome alias'],
+    ['githubAction', { owner: 'owner', repo: 'repo', workflowId: 'workflowId' }, 'GitHub: owner/repo/workflowId'],
     ['ccTray', { alias: 'awesome alias' }, 'CCTray: awesome alias'],
     ['ccTray', { name: 'awesome name' }, 'CCTray: awesome name'],
     ['ccTray', { url: 'awesome url' }, 'CCTray: awesome url'],

@@ -57,6 +57,7 @@ export class ObserverManager {
   ) {}
 
   private calculateGlobalStatus(states: State[]): Status {
+    if (states.length === 0) return Status.NA;
     if (states.some((s) => s.status === Status.FAILURE)) return Status.FAILURE;
     if (states.some((s) => s.status === Status.NA)) return Status.NA;
     if (states.some((s) => s.status === Status.CHECKING)) return Status.CHECKING;

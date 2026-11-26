@@ -7,6 +7,7 @@ import {
   isEnabled as isAutostartEnabled,
 } from '@tauri-apps/plugin-autostart';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import { writeText as writeNativeClipboard } from '@tauri-apps/plugin-clipboard-manager';
 
 import {
   BarklarmConfig,
@@ -41,7 +42,7 @@ import {
 } from '../../types/Intelligence';
 import { State } from '../../types/State';
 import type { AppRPCClient } from '../runtime/types';
-import { openExternal as openExternalUrl, setupAppMenu, TrayPresenter } from './tray';
+import { openExternal as openExternalUrl, openIssue, setupAppMenu, TrayPresenter } from './tray';
 
 const noopPresenter: ObserverPresenter = {
   updateImage: () => undefined,
@@ -95,6 +96,39 @@ async function saveConfig(): Promise<void> {
 async function ensureNotificationPermission(): Promise<boolean> {
   if (await isPermissionGranted()) return true;
   return (await requestPermission()) === 'granted';
+}
+
+async function writeClipboardText(text: string): Promise<boolean> {
+  try {
+    await writeNativeClipboard(text);
+    return true;
+  } catch {
+    // The native capability may be unavailable in an unsupported host; keep a web fallback.
+  }
+
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fall back to the selection-based copy path below.
+  }
+
+  try {
+    const area = document.createElement('textarea');
+    area.value = text;
+    area.setAttribute('readonly', '');
+    area.style.position = 'fixed';
+    area.style.opacity = '0';
+    document.body.appendChild(area);
+    area.select();
+    const copied = document.execCommand('copy');
+    document.body.removeChild(area);
+    return copied;
+  } catch {
+    return false;
+  }
 }
 
 async function notify(title: string, body: string): Promise<void> {
@@ -348,6 +382,10 @@ async function initialize(): Promise<void> {
       console.error('Failed to create tray:', error);
       return null;
     });
+    if (!tray) {
+      // Never leave a release build with no tray and no visible surface.
+      await invoke('show_window').catch((error) => console.error('Failed to show the main window:', error));
+    }
     await setupAppMenu().catch((error) => console.error('Failed to set app menu:', error));
 
     const next = analysisConfig();
@@ -532,6 +570,36 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
     },
 
     testInferenceProvider,
+
+    async writeClipboard(text: string): Promise<boolean> {
+      await ready();
+      return writeClipboardText(text);
+    },
+
+    async openIssue(observerId: string): Promise<boolean> {
+      await ready();
+      const state = manager?.getStates().find((candidate) => candidate.id === observerId);
+      if (!state || !state.error) return false;
+      const endpoint = state.issueEndpoint || config.issueGlobalEndpoint || '';
+      if (!isHttpUrl(endpoint)) return false;
+      openIssue(state, endpoint);
+      return true;
+    },
+
+    async openMainWindow(): Promise<void> {
+      await ready();
+      await invoke('open_main_window');
+    },
+
+    async hideWindow(): Promise<void> {
+      await ready();
+      await invoke('hide_window');
+    },
+
+    async setTrayPanelHeight(height: number): Promise<void> {
+      await ready();
+      await invoke('resize_tray_panel', { height });
+    },
 
     async openExternal(url: string): Promise<boolean> {
       await ready();

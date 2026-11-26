@@ -88,6 +88,11 @@ Select a scenario with a query parameter:
 | `intelligence-provider-unavailable` | Custom provider unreachable                            |
 | `intelligence-remote-consent` | Remote destination awaiting consent                         |
 | `intelligence-unsupported-hardware` | Managed runtime unsupported on this profile          |
+| `radiator-mixed`          | Healthy, failed, muted, checking and unavailable sources for the radiator |
+| `radiator-resolving`      | A failure resolves during inspection; stale diagnosis must disappear        |
+| `handoff-injection`       | Evidence with synthetic malicious instructions                              |
+| `handoff-clipboard-failure` | Clipboard write denied; preview remains selectable                        |
+| `intelligence-recovery`   | Failed analysis recovers after an explicit retry                            |
 
 Examples:
 
@@ -99,6 +104,33 @@ http://127.0.0.1:1420/?scenario=persistence&reset=1
 
 Diagnostic scenarios enable the opt-in setting in their seeded config, except `diagnostics-disabled`. Expand the failed
 observer row to inspect the evidence panel. None of these scenarios make network requests.
+
+### Routes and tray mock
+
+The full window opens on `/radiator` and also exposes `/radiator/observer/:id`, `/observers` and `/settings`.
+`/general` redirects to `/settings`. The tray overlay is a separate shell on `/tray`, `/tray/observer/:id` and
+`/tray/handoff/:id`.
+
+In the browser mock the overlay is reachable directly; native window sizing and tray clicks are not simulated:
+
+```text
+http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray
+http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray/observer/mock-mixed-ci
+http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-ci
+```
+
+In the native app, clicking the menu-bar icon toggles one overlay. There is no second right-click menu design on
+macOS/Windows. Linux keeps a minimal native menu fallback because Tauri cannot emit tray click events there.
+
+### Visual capture
+
+`bun run dev:mock` must already be running. Capture synthetic screenshots with:
+
+```sh
+bun run capture:phase3
+```
+
+The script uses the default window sizes and writes under `docs/media/phase3/`. It never uses real data.
 
 - `reset=1` clears only that scenario's key and reseeds it.
 - Without `reset`, edits survive reloads.
@@ -186,6 +218,11 @@ These are tracked, not silently ignored:
 - The CSP is set but not interactively validated on every release target; the HTTP capability still allows any HTTP(S)
   host for user-configured integrations. Both are documented in [SECURITY.md](SECURITY.md).
 - Managed runtime execution is verified locally on macOS arm64 only; other targets require native CI/human smoke tests.
+- Native notification click routing is unchanged. The tray overlay (macOS/Windows) and native menu fallback (Linux) are
+  the supported paths to a failure detail; richer notification actions remain Phase 4 work.
+- The tray overlay's native focus/blur, full-app transition and clipboard write could not be exercised interactively in
+  the Phase 3 agent environment. They are implemented and covered by Rust placement tests and browser tests, but the
+  native interactions remain unverified until Phase 4.
 - The native build warns that the bundle identifier ends in `.app`; changing it would break update
   identity and needs a migration decision.
 - `.codeclimate.yml` still references an old renderer path and ESLint 6 and is not used by CI.

@@ -59,6 +59,11 @@ const requiredScenarios = [
   'intelligence-provider-unavailable',
   'intelligence-remote-consent',
   'intelligence-unsupported-hardware',
+  'intelligence-recovery',
+  'radiator-mixed',
+  'radiator-resolving',
+  'handoff-injection',
+  'handoff-clipboard-failure',
 ];
 
 describe('mock runtime', () => {
@@ -342,5 +347,81 @@ describe('mock runtime', () => {
 
     expect(await client.openExternal('https://github.com/acme/api/actions/runs/1')).toBe(true);
     expect(await client.openExternal('javascript:alert(1)')).toBe(false);
+  });
+});
+
+describe('phase 3 mock scenarios', () => {
+  it('seeds the mixed radiator scenario', async () => {
+    const client = createMockClient({
+      scenarioName: 'radiator-mixed',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const states = await client.getObserverStates();
+    expect(states.map((state) => state.status)).toEqual([
+      Status.FAILURE,
+      Status.SUCCESS,
+      Status.FAILURE,
+      Status.SUCCESS,
+      Status.CHECKING,
+      Status.NA,
+      Status.SUCCESS,
+    ]);
+    expect(states[2].muted).toBe(true);
+
+    const evidence = await client.getDiagnosticEvidence('mock-mixed-ci');
+    expect(evidence.status).toBe('available');
+    expect(evidence.evidence?.failureId).toBe('1001:1');
+  });
+
+  it('resolves a failure after the configured number of state reads', async () => {
+    const client = createMockClient({
+      scenarioName: 'radiator-resolving',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect((await client.getObserverStates())[0].status).toBe(Status.FAILURE);
+    await client.getObserverStates();
+    await client.getObserverStates();
+    expect((await client.getObserverStates())[0].status).toBe(Status.SUCCESS);
+  });
+
+  it('fails clipboard writes deterministically', async () => {
+    const client = createMockClient({
+      scenarioName: 'handoff-clipboard-failure',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    expect(await client.writeClipboard('prompt')).toBe(false);
+  });
+
+  it('keeps synthetic malicious instructions in the injection evidence', async () => {
+    const client = createMockClient({
+      scenarioName: 'handoff-injection',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    const snapshot = await client.getDiagnosticEvidence('mock-handoff-injection');
+    expect(snapshot.evidence?.items.some((item) => item.content.includes('IGNORE ALL PREVIOUS INSTRUCTIONS'))).toBe(
+      true
+    );
+  });
+
+  it('recovers a failed analysis after reanalyze', async () => {
+    const client = createMockClient({
+      scenarioName: 'intelligence-recovery',
+      storage: new MemoryStorage(),
+      reset: true,
+    });
+    let initial = await client.getAnalysis('mock-ai-recovery');
+    for (let index = 0; index < 3 && initial.status !== 'failed'; index += 1) {
+      initial = await client.getAnalysis('mock-ai-recovery');
+    }
+    expect(initial.status).toBe('failed');
+    await client.reanalyze('mock-ai-recovery');
+    await client.getAnalysis('mock-ai-recovery');
+    await client.getAnalysis('mock-ai-recovery');
+    const recovered = await client.getAnalysis('mock-ai-recovery');
+    expect(recovered.status).toBe('available');
   });
 });

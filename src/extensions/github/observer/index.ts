@@ -15,7 +15,7 @@ export class GithubAction extends Observer {
   private diagnosticProvider?: DiagnosticProvider;
 
   constructor({ authToken, owner, repo, workflowId, alias, issueEndpoint, muted }: GithubActionConfiguration) {
-    super(alias || `Github: ${owner}/${repo}/${workflowId}`, issueEndpoint, muted);
+    super(alias || `GitHub: ${owner}/${repo}/${workflowId}`, issueEndpoint, muted);
     this.authToken = authToken;
     this.owner = owner;
     this.repo = repo;

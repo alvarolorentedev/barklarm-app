@@ -19,6 +19,7 @@
     "notification:default",
     "autostart:default",
     "dialog:default",
-    "opener:default"
+    "opener:default",
+    "clipboard-manager:allow-write-text"
   ]
 }
