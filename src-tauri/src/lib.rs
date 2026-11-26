@@ -70,7 +70,7 @@ fn apply_tray_position(
     Ok(())
 }
 
-fn apply_tray_window_effects(window: &tauri::WebviewWindow) {
+fn apply_tray_window_effects(_window: &tauri::WebviewWindow) {
     #[cfg(target_os = "macos")]
     {
         let effects = WindowEffectsConfig {
@@ -78,7 +78,7 @@ fn apply_tray_window_effects(window: &tauri::WebviewWindow) {
             state: Some(WindowEffectState::Active),
             ..Default::default()
         };
-        let _ = window.set_effects(Some(effects));
+        let _ = _window.set_effects(Some(effects));
     }
     #[cfg(target_os = "windows")]
     {
@@ -86,7 +86,7 @@ fn apply_tray_window_effects(window: &tauri::WebviewWindow) {
             effects: vec![WindowEffect::Acrylic],
             ..Default::default()
         };
-        let _ = window.set_effects(Some(effects));
+        let _ = _window.set_effects(Some(effects));
     }
 }
 
