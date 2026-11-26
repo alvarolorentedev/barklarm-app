@@ -14,7 +14,8 @@ Native (bun run dev / packaged app)
                           -> Tauri invoke -> src-tauri/src/store.rs -> config.json
        -> desktop/client -> EvidenceManager -> extensions/<name>/diagnostics -> fetch-adapter -> Tauri HTTP
                           -> AnalysisManager -> context/prompt/validator -> managed or custom provider
-                          -> Tauri invoke -> intelligence sidecar, model store, credentials
+                             -> Tauri HTTP transport (inference TLS isolated from observer sslDisabled)
+                          -> Tauri invoke -> serialized runtime lifecycle, verified model store, credentials
   StrictMode + HashRouter; tray remains the primary surface when the window is closed.
 
 Browser mock (bun run dev:mock)
@@ -94,9 +95,10 @@ already exist for every integration and drive distinct failure notifications. Gi
 - Analysis is a separate in-memory contract. `AnalysisManager` consumes evidence events, assembles a deterministic
   bounded context, calls a provider, validates schema/citations/secrets and exposes an `AnalysisSnapshot`. It never
   changes `State` or the webhook.
-- Intelligence is disabled by default. Managed mode uses a pinned llama.cpp sidecar and a verified on-demand GGUF model.
-  Custom mode uses an OpenAI-compatible endpoint. Remote/private destinations require consent stored outside the config.
-  Connectivity tests never include evidence.
+- Intelligence is disabled by default. Managed mode uses a pinned llama.cpp sidecar under a serialized native lifecycle
+  and a manifest-bound verified GGUF model. Custom mode uses an OpenAI-compatible endpoint. Remote/private destinations
+  require SHA-256-bound consent stored outside the config; the renderer uses the Tauri HTTP transport and never falls
+  back to browser fetch. Connectivity tests never include evidence.
 - Model output is rendered as text, never executed. Unknown citations, invalid JSON, secrets and destructive commands
   reject the response. See [INTELLIGENCE.md](../engineering/INTELLIGENCE.md).
 - Managed-runtime support is per platform; see [the runtime matrix](../evaluations/0002-runtime-platform-matrix.md).
@@ -110,7 +112,8 @@ already exist for every integration and drive distinct failure notifications. Gi
 - Browser acceptance: Playwright against `dev:mock`, artifacts in `test-results/`.
 - Deterministic evaluations: `bun run test:evals:mock` runs in `bun run check` without a model.
 - Real-model evaluations: explicit `bun run test:evals:local`; results stay under gitignored `evals/results/`.
-- Native checks: cargo fmt, clippy, tests in CI; the sidecar job fetches and smoke-tests the pinned runtime;
-  release tagging builds all five bundles.
+- Native checks: cargo fmt, clippy, tests in CI; the sidecar job fetches and check-tests the pinned runtime; the
+  opt-in `sidecar:smoke:runtime` verifies model hash, loopback binding, auth rejection, real structured inference,
+  production validation and cleanup. A manual release-candidate workflow packages all five targets without publishing.
 
 Decisions that changed this shape are recorded in [decisions/](decisions/).

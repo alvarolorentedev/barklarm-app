@@ -77,9 +77,14 @@ Redaction also changes evidence, so the envelope reports `content_redacted` and 
   as local inference controlled by Barklarm.
 - Custom loopback endpoints may use HTTP; non-loopback endpoints require HTTPS. URLs with credentials, query strings or
   fragments are rejected. Redirects are disabled; Authorization headers are not forwarded.
-- Private and remote destinations require explicit consent. Consent records live in the OS credential store, not the
-  imported config, so an import cannot silently authorize transmission. Imported configurations reset intelligence to
-  disabled; changing the destination/model invalidates consent.
+- Desktop inference uses the Tauri HTTP transport under the production CSP. Inference never falls back to browser
+  `fetch` and never inherits the observer `sslDisabled` switch; remote/private TLS certificates and hostnames are always
+  validated. Certificate failures surface as provider errors.
+- Private and remote destinations require explicit consent. Consent and provider keys use a SHA-256 digest of the
+  canonical endpoint path plus model, prefixed to distinguish it from the old cache fingerprint. They live in the OS
+  credential store, not the imported config, so an import cannot silently authorize transmission. Native import writes
+  `intelligenceMode: disabled` in the same atomic config write. Changing the destination or model invalidates consent;
+  users can revoke it. Existing approvals/keys from the Phase 2 cache-hash scheme require re-approval/re-entry.
 - Connectivity tests use a model list or a minimal non-evidence prompt. Evidence is never part of a test.
 - API keys use the OS credential store, scoped by destination fingerprint. They are not in config, exports, prompts, logs
   or fixtures. The renderer holds a key in memory only for the request; this residual renderer-trust boundary is accepted
@@ -90,10 +95,17 @@ Redaction also changes evidence, so the envelope reports `content_redacted` and 
   commands, wrong observer/failure/fingerprint. At most one repair request. Raw invalid output is never displayed.
 - Model output is rendered as text. Commands are never executed; generated URLs are never auto-opened. Recommendations are
   not applied automatically.
-- Managed runtime: loopback only, free port, ephemeral token via a mode-0600 file, explicit argument allowlist, no web
-  UI/slots/props/metrics/model retrieval, output discarded, supervised shutdown and bounded inactivity.
-- Models are downloaded only after consent, verified by size/SHA-256 and GGUF header, written through a temporary file and
-  atomically promoted. Downloaded content is never executed.
+- Managed runtime: loopback only, serialized lifecycle, free port, health/auth probe against the intended model,
+  ephemeral token created exclusively with mode 0600 via a file (never arguments), explicit argument allowlist, no web
+  UI/slots/props/metrics/model retrieval, output discarded, supervised shutdown and bounded inactivity. Startup checks
+  cancellation before publishing; active inference leases are protected from idle reaping.
+- Process cleanup requires a per-instance marker whose PID start identity and executable path still match, and whose
+  owner is not a live concurrent Barklarm instance. Concurrent instances have separate markers. A stale marker alone
+  never authorizes signalling a process; an unreadable owner identity is treated as possibly alive (fail closed).
+- Models are downloaded only after consent, written through a temporary file, bounded to the manifest size and promoted
+  only if SHA-256 and GGUF header match. A JSON record binds the installed file to model id, version, file name, size and
+  SHA-256. Status checks are lightweight; activation performs a full asynchronous hash. Cancelled/removed downloads
+  cannot promote, and an existing valid model is not deleted before its replacement is verified.
 - Runtime binaries are pinned by build and per-platform SHA-256, fetched into a gitignored directory and bundled with their
   licenses. Standard CI does not download models.
 
@@ -103,7 +115,20 @@ Residual risks:
   grounding is measured only by the evaluation set.
 - A localhost external runtime can forward data elsewhere; the UI states this.
 - Pattern redaction and output scanning cannot prove that every secret was removed.
-- The renderer holds integration tokens and, briefly, a provider key; a renderer compromise remains high impact.
+- The renderer holds integration tokens and, briefly, a provider key; a renderer compromise remains high impact. The
+  key is never forwarded to the managed runtime or another destination.
+- A loopback custom provider is externally managed: Barklarm can enforce scheme/consent but cannot prove where it sends
+  data.
+- Port allocation is check-then-spawn. Barklarm verifies authentication, the model alias and (where the OS tool exposes
+  it) the listening PID before publishing an endpoint, but a hostile local process racing the port remains outside the
+  guarantee.
+- Process signalling is a check-then-kill operation. Identity is verified immediately before signalling, but a local
+  attacker racing PID reuse is outside the guarantee. Platforms without a usable identity tool retain the marker and do
+  not signal.
+- Activation hashing is cooperative and cancellable; the in-process hash cache trusts path/size/mtime after a successful
+  full hash. Local write access to the application data directory is outside the integrity boundary.
+- Process identity checks rely on OS process metadata; abrupt termination and PID reuse are handled best-effort, and
+  platforms without a stable identity are documented rather than assumed safe.
 - The sidecar and libraries are dynamic; signing/notarization must cover every bundled library before a signed release.
 
 ## Phase 2 threat model additions
@@ -115,12 +140,12 @@ Residual risks:
 | Secret reproduction | Evidence sanitization; output credential scan rejects the analysis | Pattern scanning cannot prove removal |
 | External destination manipulation | Scheme/host validation, HTTPS for non-loopback, no URL credentials, no redirects, destination display and consent | User can approve a hostile destination |
 | Imported config enabling remote processing | Consent stored outside config; import cannot create approval | A user can approve manually |
-| Runtime process injection | Fixed executable path, explicit argument allowlist, no shell, Rust-owned spawn | Local user with process rights can still interfere |
+| Runtime process injection | Fixed executable path, explicit argument allowlist, no shell, Rust-owned spawn, identity-verified cleanup | Local user with process rights can still interfere |
 | Local server exposure | Loopback bind, ephemeral token, no web UI/slots/props, output discarded | Other local processes can connect if they learn the token |
 | Runtime supply chain | Pinned build, per-asset SHA-256, HTTPS source, no execution of downloaded content | Upstream compromise remains possible |
-| Corrupted/malicious model | Size/SHA-256, GGUF header, verification marker, runtime parser isolation | Parser vulnerabilities remain possible |
+| Corrupted/malicious model | Manifest-bound verification record, activation-time full SHA-256, GGUF header, runtime parser isolation | Parser vulnerabilities remain possible; local write access to app data is outside the boundary |
 | Unsafe output rendering | Text-only rendering; no HTML, command or URL execution | User can copy a recommendation manually |
-| Resource exhaustion | Queue/concurrency limits, output/context budgets, timeouts, one runtime slot, idle shutdown | A model can still use significant CPU/memory while active |
+| Resource exhaustion | Queue/concurrency limits, normalized context/output budgets, full request deadlines, one runtime slot, active-inference protection, idle shutdown | A model can still use significant CPU/memory while active |
 | Untrusted imported configuration | Normalization, consent outside config, no auto-download/auto-inference | Invalid custom endpoints fail closed |
 
 ## Content security policy
@@ -133,9 +158,11 @@ explicitly. The HTTP capability remains broad for user-configured integrations a
 
 ## SSL verification
 
-`sslDisabled` is opt-in, clearly labeled in settings and only affects the Tauri HTTP client. It enables accepting
-invalid certificates and hostnames, which exposes the user to man-in-the-middle attacks. Do not enable it by default, in
-mock mode or in tests.
+`sslDisabled` is opt-in, clearly labeled in settings and only affects observer/integration HTTP through
+`createObserverFetch`. It enables accepting invalid certificates and hostnames, which exposes the user to
+man-in-the-middle attacks. It never affects inference: `createInferenceFetch` always validates certificates and
+hostnames. Do not enable it by default, in mock mode or in tests. A custom inference provider with an invalid
+certificate fails instead of silently downgrading.
 
 ## Mock and test data
 

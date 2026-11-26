@@ -32,8 +32,19 @@ For managed inference, stage the pinned runtime once per target:
 bun run sidecar:fetch
 ```
 
-The script downloads the pinned llama.cpp build, verifies its SHA-256 and places the binary and libraries under
-`src-tauri/binaries/` (gitignored). Standard TypeScript, browser and deterministic evaluation work does not need it.
+The script downloads the pinned llama.cpp build, verifies its SHA-256 and places the binary, shared libraries and
+licenses under `src-tauri/binaries/` (gitignored). Standard TypeScript, browser and deterministic evaluation work does
+not need it.
+
+```sh
+bun run sidecar:smoke          # binary availability only
+bun run sidecar:smoke:runtime  # opt-in: model hash, loopback, auth, structured inference, validation, cleanup
+bun run test:evals:mock        # deterministic production-pipeline evaluation
+bun run test:evals:local       # explicit real-model evaluation; never standard CI
+```
+
+`sidecar:smoke:runtime` requires the pinned model in the app data directory or `BARKLARM_MODEL_PATH`. It is not part of
+`bun run check`.
 
 ### Plain renderer debugging
 

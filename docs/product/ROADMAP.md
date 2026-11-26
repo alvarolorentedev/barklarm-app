@@ -43,6 +43,22 @@ Goal: explain a failure and recommend a next action using a local model.
 See [spec 0002](../specs/0002-local-intelligence-engine.md) and [the model report](../evaluations/0001-model-selection.md).
 Other managed-runtime targets still need native smoke validation.
 
+## Phase 2.1 — Intelligence hardening (implemented on the hardening branch)
+
+Goal: make Phase 2 reliable, secure, bounded and demonstrably functional before expanding the product.
+
+- [x] Native inference transport under the restrictive CSP; inference TLS isolated from observer compatibility.
+- [x] SHA-256 destination consent/credential identity with revocation and atomic import disabling.
+- [x] Full request-lifecycle deadlines/cancellation and bounded structured-output fallback.
+- [x] Serialized native runtime lifecycle, identity-verified cleanup and active-inference protection.
+- [x] Manifest-bound model records, activation-time hash and race-safe download/cancel/remove.
+- [x] Unified evidence/analysis retention, stale-result protection and normalized context budgets.
+- [x] Production-pipeline evaluations with model safety separated from application safeguards.
+- [x] Opt-in real-runtime smoke test and a non-publishing release-candidate workflow.
+- [ ] Full interactive inference qualification on every released platform (macOS arm64 validated; others remain work).
+
+See [spec 0003](../specs/0003-intelligence-hardening.md).
+
 ## Phase 3 — Evaluated assistance
 
 Goal: ship diagnosis only when evaluations show it is correct, grounded and safe.

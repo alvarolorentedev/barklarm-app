@@ -24,8 +24,11 @@ The release workflow triggers on tags matching `v*`.
    - Linux x64 (`ubuntu-24.04`)
    - Linux arm64 (`ubuntu-24.04-arm`)
    - Windows x64 (`windows-latest`)
-6. The release job downloads bundles and publishes the GitHub release with generated notes. Bundles include the runtime
-   libraries and upstream license files; model weights are never bundled and are downloaded by the user on demand.
+6. The release job downloads bundles and publishes the GitHub release with generated notes. Bundles include only the
+   runtime binary, shared libraries and upstream license files; model weights are never bundled and are downloaded by
+   the user on demand.
+7. Before a tag, run the manual `Release candidate validation` workflow. It builds and uploads the five target bundles
+   without creating a release and without downloading a model. Compilation/packaging is not runtime qualification.
 
 Workflow permissions are least-privilege: repository contents are read-only except the release job, which needs
 `contents: write`.
@@ -45,8 +48,14 @@ bun run build
 ls src-tauri/target/release/bundle/
 ```
 
-Managed-runtime packages must additionally verify that the sidecar and its libraries launch with the bundled model. State
-the exact platform/architecture and do not claim cross-platform execution from one host.
+Managed-runtime packages must additionally verify that the sidecar and its libraries launch with the bundled model:
+
+```sh
+bun run sidecar:smoke:runtime
+```
+
+State the exact platform/architecture and do not claim cross-platform execution from one host. Passing the version
+check or compiling a bundle is not runtime qualification.
 
 This requires the platform Tauri dependencies and takes several minutes. Agents may validate TypeScript, browser
 behavior and Rust checks without producing installers; report the native build as unrun if it was not executed.
