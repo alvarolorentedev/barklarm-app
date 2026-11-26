@@ -116,12 +116,15 @@ pub fn run() {
             intelligence::remove_model,
             intelligence::ensure_managed_runtime,
             intelligence::stop_managed_runtime,
+            intelligence::begin_managed_inference,
+            intelligence::end_managed_inference,
             intelligence::get_provider_key,
             intelligence::set_provider_key,
             intelligence::delete_provider_key,
             intelligence::has_provider_key,
             intelligence::is_destination_approved,
             intelligence::approve_destination,
+            intelligence::revoke_destination,
         ])
         .setup(|app| {
             #[cfg(target_os = "macos")]

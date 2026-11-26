@@ -92,25 +92,22 @@ async function main() {
 
   const binaries = join(process.cwd(), 'src-tauri', 'binaries');
   const libs = join(binaries, 'llama-libs');
+  // Replace the library directory so old archive tools do not accumulate in
+  // the shipped bundle. Only shared libraries, Metal shaders and licenses ship.
+  await rm(libs, { recursive: true, force: true });
   await mkdir(libs, { recursive: true });
-  await copyFile(binarySource, join(binaries, `llama-server-${triple}`));
-  if (process.platform !== 'win32') await chmod(join(binaries, `llama-server-${triple}`), 0o755);
+  const binaryDestination = join(binaries, `llama-server-${triple}`);
+  // Overwriting an ad-hoc-signed Mach-O in place can leave macOS executing a
+  // stale signature cache (SIGKILL). Replace the inode instead.
+  await rm(binaryDestination, { force: true });
+  await copyFile(binarySource, binaryDestination);
+  if (process.platform !== 'win32') await chmod(binaryDestination, 0o755);
 
+  const isLibrary = (entry: string): boolean => /\.(dylib|so(\.\d+)*|dll|metal)$/.test(entry);
   for (const entry of await readdir(root)) {
     if (entry === asset.binary) continue;
-    if (
-      entry.startsWith('libggml') ||
-      entry.startsWith('libllama') ||
-      entry.startsWith('libmtmd') ||
-      entry.startsWith('ggml') ||
-      entry.startsWith('llama') ||
-      entry.startsWith('mtmd') ||
-      entry.startsWith('libomp') ||
-      entry === 'LICENSE' ||
-      entry.startsWith('LICENSE-')
-    ) {
-      await copyFile(join(root, entry), join(libs, entry));
-    }
+    const ship = isLibrary(entry) || entry === 'LICENSE' || entry.startsWith('LICENSE-');
+    if (ship) await copyFile(join(root, entry), join(libs, entry));
   }
 
   await rm(work, { recursive: true, force: true });

@@ -39,7 +39,8 @@
     "sidecar:fetch": "bun scripts/fetch-llama.ts",
     "test:evals:mock": "bun scripts/evals/run.ts --mode=mock",
     "test:evals:local": "bun scripts/evals/run.ts --mode=local",
-    "sidecar:smoke": "bun scripts/smoke-sidecar.ts"
+    "sidecar:smoke": "bun scripts/smoke-sidecar.ts",
+    "sidecar:smoke:runtime": "bun scripts/smoke-managed-runtime.ts"
   },
   "devDependencies": {
     "@faker-js/faker": "8.4.1",

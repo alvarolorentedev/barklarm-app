@@ -115,17 +115,25 @@ pub async fn intelligence_status(
     app: AppHandle,
     state: State<'_, IntelligenceState>,
 ) -> Result<IntelligenceStatus, String> {
+    let manifest_model = manifest::default_model()?;
     let (_, model) = model_info(&app, &state)?;
-    let download = download::status(&state.download, &app, &manifest::default_model()?);
+    let download = download::status(&state.download, &app, &manifest_model);
+    let runtime = state.runtime.status();
+    let data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|_| "app_data_directory".to_string())?;
     let hardware = hardware::report(
-        &app.path()
-            .app_data_dir()
-            .map_err(|_| "app_data_directory".to_string())?,
+        &data_dir,
+        &manifest_model,
+        download.status == "installed",
+        &runtime.state,
+        runtime::artifact_available(&app),
     );
     Ok(IntelligenceStatus {
         model,
         download,
-        runtime: state.runtime.status(),
+        runtime,
         hardware,
     })
 }
@@ -151,9 +159,8 @@ pub async fn remove_model(
     state: State<'_, IntelligenceState>,
 ) -> Result<(), String> {
     state.runtime.stop().await;
-    download::cancel(&state.download);
     let model = manifest::default_model()?;
-    download::remove(&app, &model)
+    download::remove(&app, &state.download, &model).await
 }
 
 #[tauri::command]
@@ -170,6 +177,16 @@ pub async fn ensure_managed_runtime(
 pub async fn stop_managed_runtime(state: State<'_, IntelligenceState>) -> Result<(), String> {
     state.runtime.stop().await;
     Ok(())
+}
+
+#[tauri::command]
+pub fn begin_managed_inference(state: State<'_, IntelligenceState>) {
+    state.runtime.begin_inference();
+}
+
+#[tauri::command]
+pub fn end_managed_inference(state: State<'_, IntelligenceState>) {
+    state.runtime.end_inference();
 }
 
 #[tauri::command]
@@ -202,6 +219,11 @@ pub fn approve_destination(fingerprint: String) -> Result<(), String> {
     credentials::approve_destination(&fingerprint)
 }
 
+#[tauri::command]
+pub fn revoke_destination(fingerprint: String) -> Result<(), String> {
+    credentials::revoke_destination(&fingerprint)
+}
+
 pub fn cleanup_stale(app: &AppHandle) {
     runtime::cleanup_stale(app);
 }
@@ -218,5 +240,6 @@ pub fn spawn_idle_reaper(app: AppHandle) {
 
 pub fn shutdown(app: &AppHandle) {
     let state = app.state::<IntelligenceState>();
+    download::cancel(&state.download);
     tauri::async_runtime::block_on(state.runtime.stop());
 }
