@@ -42,7 +42,7 @@
     "sidecar:smoke": "bun scripts/smoke-sidecar.ts"
   },
   "devDependencies": {
-    "@faker-js/faker": "8.4.1",
+    "@faker-js/faker": "10.6.0",
     "@playwright/test": "^1.65.1",
     "@tauri-apps/cli": "^2.12.4",
     "@testing-library/jest-dom": "^6.4.8",
