@@ -96,7 +96,10 @@ async function main() {
   // the shipped bundle. Only shared libraries, Metal shaders and licenses ship.
   await rm(libs, { recursive: true, force: true });
   await mkdir(libs, { recursive: true });
-  const binaryDestination = join(binaries, `llama-server-${triple}`);
+  // Tauri resolves external binaries by target triple and keeps the platform
+  // executable suffix, which Windows requires for the sidecar to launch.
+  const suffix = process.platform === 'win32' ? '.exe' : '';
+  const binaryDestination = join(binaries, `llama-server-${triple}${suffix}`);
   // Overwriting an ad-hoc-signed Mach-O in place can leave macOS executing a
   // stale signature cache (SIGKILL). Replace the inode instead.
   await rm(binaryDestination, { force: true });

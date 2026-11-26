@@ -12,6 +12,9 @@ concurrency:
 
 env:
   BUN_VERSION: '1.4.5'
+  # linuxdeploy ships as an AppImage; extract it instead of relying on FUSE,
+  # which current ubuntu-24.04 runners do not provide.
+  APPIMAGE_EXTRACT_AND_RUN: '1'
 
 # Manual, non-publishing build. It proves native compilation, sidecar staging,
 # packaging and artifact production. It does not download a model and does not
