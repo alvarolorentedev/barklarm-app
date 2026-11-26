@@ -8,10 +8,13 @@ import {
   ProviderCapabilities,
   ProviderTestResult,
 } from '../../../types/Intelligence';
+import { validateEndpoint } from '../endpoint-policy';
 import { FetchLike, OpenAICompatibleProvider } from './openai-compatible';
 
 export type ManagedRuntimeAccess = {
   ensure(signal?: AbortSignal, contextWindow?: number): Promise<ManagedRuntimeEndpoint>;
+  beginInference?: () => Promise<void>;
+  endInference?: () => Promise<void>;
 };
 
 /**
@@ -55,6 +58,11 @@ export class ManagedInferenceProvider implements InferenceProvider {
         unsupported_hardware: 'unsupported_hardware',
       };
       throw new InferenceError('unavailable', code || 'runtime_unavailable', reasons[code] || 'provider_unavailable');
+    }
+    const validation = validateEndpoint(endpoint.endpoint);
+    if (validation.ok === false || validation.classification !== 'loopback' || !endpoint.token) {
+      // The managed token must never leave the native loopback endpoint.
+      throw new InferenceError('configuration', 'managed_endpoint_invalid');
     }
     const nextModel = endpoint.model || this.model || 'barklarm-managed-default';
     if (
@@ -106,14 +114,34 @@ export class ManagedInferenceProvider implements InferenceProvider {
     await this.ensureInner(signal);
     const inner = this.inner;
     if (!inner) throw new InferenceError('unavailable');
-    return inner.infer(request, signal);
+    try {
+      await this.access.beginInference?.();
+    } catch (error) {
+      const code = typeof error === 'string' ? error : '';
+      throw new InferenceError('unavailable', code || 'runtime_unavailable', 'runtime_failed');
+    }
+    try {
+      return await inner.infer(request, signal);
+    } finally {
+      await this.access.endInference?.();
+    }
   }
 
   async tokenize(text: string, signal: AbortSignal): Promise<number> {
     await this.ensureInner(signal);
     const inner = this.inner;
     if (!inner?.tokenize) throw new InferenceError('unsupported');
-    return inner.tokenize(text, signal);
+    try {
+      await this.access.beginInference?.();
+    } catch (error) {
+      const code = typeof error === 'string' ? error : '';
+      throw new InferenceError('unavailable', code || 'runtime_unavailable', 'runtime_failed');
+    }
+    try {
+      return await inner.tokenize(text, signal);
+    } finally {
+      await this.access.endInference?.();
+    }
   }
 
   async dispose(): Promise<void> {

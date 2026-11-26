@@ -3,7 +3,8 @@ import { InferenceError, InferenceRequest } from '../../../types/Intelligence';
 import { OpenAICompatibleProvider } from './openai-compatible';
 
 function response(status: number, body: unknown, headers: Record<string, string> = {}) {
-  const map: Record<string, string> = {};
+  const serialized = typeof body === 'string' ? body : JSON.stringify(body);
+  const map: Record<string, string> = { 'content-length': String(serialized.length) };
   for (const [key, value] of Object.entries(headers)) map[key.toLowerCase()] = value;
   return {
     ok: status >= 200 && status < 300,
@@ -116,6 +117,161 @@ describe('OpenAI-compatible provider', () => {
     await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
   });
 
+  it('keeps cancellation active after response headers arrive', async () => {
+    const cancel = vi.fn(async () => undefined);
+    let readStarted: () => void = () => undefined;
+    const started = new Promise<void>((resolve) => {
+      readStarted = resolve;
+    });
+    const provider = new OpenAICompatibleProvider({
+      name: 'test',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'test-model',
+      fetch: (async (): Promise<any> => ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        body: {
+          getReader: () => ({
+            read: () => {
+              readStarted();
+              return new Promise(() => undefined);
+            },
+            cancel,
+            releaseLock: vi.fn(),
+          }),
+        },
+        text: async () => '',
+      })) as any,
+    });
+    const controller = new AbortController();
+    const pending = provider.infer(request, controller.signal);
+    await started;
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'cancelled' });
+    expect(cancel).toHaveBeenCalled();
+  });
+
+  it('times out a stalled response body after headers', async () => {
+    vi.useFakeTimers();
+    try {
+      const cancel = vi.fn(async () => undefined);
+      let readStarted: () => void = () => undefined;
+      const started = new Promise<void>((resolve) => {
+        readStarted = resolve;
+      });
+      const provider = new OpenAICompatibleProvider({
+        name: 'test',
+        endpoint: 'http://127.0.0.1:8080/v1',
+        model: 'test-model',
+        fetch: (async (): Promise<any> => ({
+          ok: true,
+          status: 200,
+          headers: { get: (): null => null },
+          body: {
+            getReader: () => ({
+              read: () => {
+                readStarted();
+                return new Promise(() => undefined);
+              },
+              cancel,
+              releaseLock: vi.fn(),
+            }),
+          },
+          text: async () => '',
+        })) as any,
+      });
+      const pending = provider.infer({ ...request, timeoutMs: 1000 }, new AbortController().signal);
+      pending.catch(() => undefined);
+      await started;
+      await vi.advanceTimersByTimeAsync(1100);
+      await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+      expect(cancel).toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('times out while waiting for response headers', async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = new OpenAICompatibleProvider({
+        name: 'test',
+        endpoint: 'http://127.0.0.1:8080/v1',
+        model: 'test-model',
+        fetch: ((_url: string, init: any) =>
+          new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+          })) as any,
+      });
+      const pending = provider.infer({ ...request, timeoutMs: 1000 }, new AbortController().signal);
+      pending.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(1100);
+      await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('enforces the deadline even when a transport ignores the abort signal', async () => {
+    vi.useFakeTimers();
+    try {
+      const provider = new OpenAICompatibleProvider({
+        name: 'test',
+        endpoint: 'http://127.0.0.1:8080/v1',
+        model: 'test-model',
+        fetch: (() => new Promise(() => undefined)) as any,
+      });
+      const pending = provider.infer({ ...request, timeoutMs: 1000 }, new AbortController().signal);
+      pending.catch(() => undefined);
+      await vi.advanceTimersByTimeAsync(1100);
+      await expect(pending).rejects.toMatchObject({ code: 'timeout' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds a streamed body even without content-length', async () => {
+    let chunk = 0;
+    const provider = new OpenAICompatibleProvider({
+      name: 'test',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'test-model',
+      fetch: (async (): Promise<any> => ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        body: {
+          getReader: () => ({
+            read: async () => {
+              chunk += 1;
+              return { done: false, value: new Uint8Array(600 * 1024).fill(65) };
+            },
+            cancel: vi.fn(async () => undefined),
+            releaseLock: vi.fn(),
+          }),
+        },
+        text: async () => '',
+      })) as any,
+    });
+    await expect(provider.infer(request, new AbortController().signal)).rejects.toMatchObject({ code: 'too_large' });
+    expect(chunk).toBeGreaterThan(1);
+  });
+
+  it('does not retry fallback modes for final provider errors', async () => {
+    for (const status of [404, 429, 500]) {
+      const fetchMock = vi.fn(async () => response(status, {}));
+      const provider = new OpenAICompatibleProvider({
+        name: 'test',
+        endpoint: 'http://127.0.0.1:8080/v1',
+        model: 'test-model',
+        fetch: fetchMock as any,
+      });
+      await expect(provider.infer(request, new AbortController().signal)).rejects.toBeInstanceOf(InferenceError);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  });
+
   it('tests connectivity without sending diagnostic evidence', async () => {
     const fetchMock = vi.fn(async (url: string) => {
       if (url.endsWith('/models')) return response(200, { data: [{ id: 'model-a' }] });
@@ -176,6 +332,42 @@ describe('OpenAI-compatible provider', () => {
       fetch: (async () => response(200, 'not json')) as any,
     });
     await expect(invalidJson.infer(request, new AbortController().signal)).rejects.toBeInstanceOf(Error);
+  });
+
+  it('fails closed for a non-stream body without a declared length', async () => {
+    const provider = new OpenAICompatibleProvider({
+      name: 'test',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'test-model',
+      fetch: (async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: (): null => null },
+        body: null as null,
+        text: async (): Promise<string> => '{}',
+      })) as any,
+    });
+    await expect(provider.infer(request, new AbortController().signal)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
+  });
+
+  it('rejects a malformed non-stream body', async () => {
+    const provider = new OpenAICompatibleProvider({
+      name: 'test',
+      endpoint: 'http://127.0.0.1:8080/v1',
+      model: 'test-model',
+      fetch: (async () => ({
+        ok: true,
+        status: 200,
+        headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? '2' : null) },
+        body: null as null,
+        text: async (): Promise<any> => undefined,
+      })) as any,
+    });
+    await expect(provider.infer(request, new AbortController().signal)).rejects.toMatchObject({
+      code: 'invalid_response',
+    });
   });
 
   it('rejects cross-origin redirects and oversized declared bodies', async () => {

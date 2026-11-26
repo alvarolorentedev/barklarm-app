@@ -43,14 +43,41 @@ function isOk(response: ResponseLike, status: number): boolean {
   return typeof response.ok === 'boolean' ? response.ok : status >= 200 && status < 300;
 }
 
-async function readBounded(response: ResponseLike): Promise<string> {
-  const declared = Number(response.headers?.get?.('content-length'));
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal, error: () => InferenceError): Promise<T> {
+  if (signal.aborted) return Promise.reject(error());
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(error());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (reason) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(reason);
+      }
+    );
+  });
+}
+
+async function readBounded(
+  response: ResponseLike,
+  signal: AbortSignal,
+  abortError: () => InferenceError
+): Promise<string> {
+  const declaredHeader = response.headers?.get?.('content-length');
+  const declared = declaredHeader === null || declaredHeader === undefined ? Number.NaN : Number(declaredHeader);
   if (Number.isFinite(declared) && declared > MAX_RESPONSE_BYTES) {
     throw new InferenceError('too_large');
   }
   const reader = response.body?.getReader?.();
   if (!reader) {
-    const text = await response.text?.();
+    // The native transport exposes a stream. A non-stream fallback is only
+    // accepted with a declared, bounded length; otherwise fail closed rather
+    // than buffering an unbounded body.
+    if (!Number.isFinite(declared) || declared < 0) throw new InferenceError('invalid_response');
+    const text = await raceAbort(Promise.resolve(response.text?.()), signal, abortError);
     if (typeof text !== 'string') throw new InferenceError('invalid_response');
     if (text.length > MAX_RESPONSE_BYTES) throw new InferenceError('too_large');
     return text;
@@ -60,47 +87,30 @@ async function readBounded(response: ResponseLike): Promise<string> {
   const decoder = new TextDecoder();
   try {
     for (;;) {
-      const chunk = await reader.read();
+      const chunk = await raceAbort(Promise.resolve(reader.read()), signal, abortError);
       if (chunk.done) break;
       const value = chunk.value as Uint8Array | undefined;
       if (!value) continue;
       total += value.byteLength;
-      if (total > MAX_RESPONSE_BYTES) {
-        try {
-          await reader.cancel?.();
-        } catch {
-          // Best effort.
-        }
-        throw new InferenceError('too_large');
-      }
+      if (total > MAX_RESPONSE_BYTES) throw new InferenceError('too_large');
       output += decoder.decode(value, { stream: true });
     }
     output += decoder.decode();
     return output;
+  } catch (error) {
+    // Cancelling the reader also releases a stalled native body.
+    try {
+      await reader.cancel?.();
+    } catch {
+      // Best effort.
+    }
+    throw error;
   } finally {
-    if (total <= MAX_RESPONSE_BYTES) reader.releaseLock?.();
-  }
-}
-
-async function readBoundedWithTimeout(response: ResponseLike, timeoutMs: number): Promise<string> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(
-      () => {
-        try {
-          void response.body?.cancel?.();
-        } catch {
-          // Best effort.
-        }
-        reject(new InferenceError('timeout'));
-      },
-      Math.max(1000, timeoutMs)
-    );
-  });
-  try {
-    return await Promise.race([readBounded(response), timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
+    try {
+      reader.releaseLock?.();
+    } catch {
+      // Best effort.
+    }
   }
 }
 
@@ -110,6 +120,8 @@ function mapStatus(status: number): InferenceError {
   if (status === 429) return new InferenceError('rate_limited');
   if (status >= 300 && status < 400) return new InferenceError('redirect_rejected');
   if (status >= 500) return new InferenceError('unavailable');
+  // Structured-output compatibility errors. Other 4xx responses are final.
+  if (status === 400 || status === 422) return new InferenceError('unsupported');
   return new InferenceError('invalid_response');
 }
 
@@ -167,14 +179,12 @@ export class OpenAICompatibleProvider implements InferenceProvider {
   }
 
   async listModels(signal?: AbortSignal): Promise<string[]> {
-    const response = await this.request(
+    const payload = await this.requestJson(
       modelsUrl(this.endpoint),
       { method: 'GET', headers: this.headers() },
       signal,
       this.timeoutMs
     );
-    if (!isOk(response, statusOf(response))) throw mapStatus(statusOf(response));
-    const payload = JSON.parse(await readBoundedWithTimeout(response, this.timeoutMs));
     const models = Array.isArray(payload?.data)
       ? payload.data.map((entry: any) => entry?.id).filter((id: unknown): id is string => typeof id === 'string')
       : [];
@@ -196,7 +206,7 @@ export class OpenAICompatibleProvider implements InferenceProvider {
     }
 
     try {
-      const response = await this.request(
+      const payload = await this.requestJson(
         chatCompletionsUrl(this.endpoint),
         {
           method: 'POST',
@@ -211,8 +221,6 @@ export class OpenAICompatibleProvider implements InferenceProvider {
         signal,
         this.timeoutMs
       );
-      if (!isOk(response, statusOf(response))) return { ok: false, error: mapStatus(statusOf(response)).code };
-      const payload = JSON.parse(await readBoundedWithTimeout(response, this.timeoutMs));
       return contentOf(payload) ? { ok: true } : { ok: false, error: 'invalid_response' };
     } catch (error) {
       return { ok: false, error: error instanceof InferenceError ? error.code : 'unavailable' };
@@ -236,14 +244,16 @@ export class OpenAICompatibleProvider implements InferenceProvider {
       } catch (error) {
         if (!(error instanceof InferenceError)) throw error;
         lastError = error;
-        if (error.code !== 'invalid_response' || mode === 'prompt-only') throw error;
+        // Only a provider rejecting the structured-output capability justifies
+        // another request. Invalid output is final and must not multiply cost.
+        if (error.code !== 'unsupported' || mode === 'prompt-only') throw error;
       }
     }
     throw lastError || new InferenceError('invalid_response');
   }
 
-  tokenize(text: string, signal: AbortSignal): Promise<number> {
-    return this.request(
+  async tokenize(text: string, signal: AbortSignal): Promise<number> {
+    const payload = await this.requestJson(
       tokenizeUrl(this.endpoint),
       {
         method: 'POST',
@@ -252,11 +262,8 @@ export class OpenAICompatibleProvider implements InferenceProvider {
       },
       signal,
       this.timeoutMs
-    ).then(async (response) => {
-      if (!isOk(response, statusOf(response))) throw mapStatus(statusOf(response));
-      const payload = JSON.parse(await readBoundedWithTimeout(response, this.timeoutMs));
-      return Array.isArray(payload?.tokens) ? payload.tokens.length : 0;
-    });
+    );
+    return Array.isArray(payload?.tokens) ? payload.tokens.length : 0;
   }
 
   async dispose(): Promise<void> {
@@ -288,15 +295,12 @@ export class OpenAICompatibleProvider implements InferenceProvider {
       body.response_format = { type: 'json_object' };
     }
 
-    const response = await this.request(
+    const payload = await this.requestJson(
       chatCompletionsUrl(this.endpoint),
       { method: 'POST', headers: this.headers(), body: JSON.stringify(body) },
       signal,
       request.timeoutMs || this.timeoutMs
     );
-    const status = statusOf(response);
-    if (!isOk(response, status)) throw mapStatus(status);
-    const payload = JSON.parse(await readBoundedWithTimeout(response, request.timeoutMs || this.timeoutMs));
     const content = contentOf(payload);
     if (!content) throw new InferenceError('invalid_response');
     const usage = content.usage
@@ -318,15 +322,20 @@ export class OpenAICompatibleProvider implements InferenceProvider {
     return headers;
   }
 
-  private async request(
+  /**
+   * One controller and one deadline cover connect, headers and body. A caller
+   * cancellation after headers therefore still cancels the body read.
+   */
+  private async requestJson(
     url: string,
     init: Record<string, unknown>,
     external: AbortSignal | undefined,
     timeoutMs: number
-  ): Promise<ResponseLike> {
+  ): Promise<any> {
     if (external?.aborted) throw new InferenceError('cancelled');
     const controller = new AbortController();
     let timedOut = false;
+    let externallyAborted = false;
     const timer = setTimeout(
       () => {
         timedOut = true;
@@ -334,30 +343,53 @@ export class OpenAICompatibleProvider implements InferenceProvider {
       },
       Math.max(1000, timeoutMs)
     );
-    const onAbort = () => controller.abort();
-    external?.addEventListener('abort', onAbort);
+    const onAbort = () => {
+      externallyAborted = true;
+      controller.abort();
+    };
+    external?.addEventListener('abort', onAbort, { once: true });
+    const abortError = (): InferenceError =>
+      timedOut ? new InferenceError('timeout') : new InferenceError('cancelled');
     try {
-      const response = (await this.fetchImpl(url, {
-        ...init,
-        signal: controller.signal,
-        redirect: 'manual',
-        maxRedirections: 0,
-      })) as ResponseLike;
+      const response = (await raceAbort(
+        Promise.resolve(
+          this.fetchImpl(url, {
+            ...init,
+            signal: controller.signal,
+            redirect: 'manual',
+            maxRedirections: 0,
+          })
+        ),
+        controller.signal,
+        abortError
+      )) as ResponseLike;
       const responseUrl = typeof response.url === 'string' ? response.url : '';
-      if (responseUrl) {
-        try {
-          if (new URL(responseUrl).origin !== new URL(url).origin) {
-            throw new InferenceError('redirect_rejected');
-          }
-        } catch (error) {
-          if (error instanceof InferenceError) throw error;
-        }
+      if (responseUrl && new URL(responseUrl).origin !== new URL(url).origin) {
+        throw new InferenceError('redirect_rejected');
       }
-      return response;
+      const status = statusOf(response);
+      if (!isOk(response, status)) {
+        // Drain a bounded error body so the connection is released; the body
+        // is never surfaced or logged.
+        try {
+          await readBounded(response, controller.signal, abortError);
+        } catch {
+          // The status remains the authoritative error.
+        }
+        throw mapStatus(status);
+      }
+      const text = await readBounded(response, controller.signal, abortError);
+      try {
+        return JSON.parse(text);
+      } catch {
+        throw new InferenceError('invalid_response');
+      }
     } catch (error) {
       if (error instanceof InferenceError) throw error;
       if (timedOut) throw new InferenceError('timeout');
-      if (external?.aborted || controller.signal.aborted) throw new InferenceError('cancelled');
+      if (externallyAborted || external?.aborted || controller.signal.aborted) {
+        throw new InferenceError('cancelled');
+      }
       throw new InferenceError('unavailable');
     } finally {
       clearTimeout(timer);

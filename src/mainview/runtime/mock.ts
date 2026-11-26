@@ -97,7 +97,14 @@ export const MOCK_HARDWARE: HardwareReport = {
   availableMemoryBytes: 8589934592,
   freeDiskBytes: 34359738368,
   cpuCount: 8,
+  platformRecognized: true,
+  runtimeArtifactAvailable: true,
+  hardwareRequirementsMet: true,
+  modelInstalled: false,
+  runtimeOperational: false,
+  releaseQualified: true,
   managedRuntimeSupported: true,
+  managedInferenceAvailable: false,
 };
 
 function mockModel(status: ModelInfo['status'] = 'not_installed'): ModelInfo {
@@ -852,6 +859,10 @@ export const mockScenarios: Record<string, MockScenario> = {
         ...MOCK_HARDWARE,
         totalMemoryBytes: 4294967296,
         availableMemoryBytes: 2147483648,
+        platformRecognized: false,
+        runtimeArtifactAvailable: false,
+        hardwareRequirementsMet: false,
+        managedInferenceAvailable: false,
         managedRuntimeSupported: false,
         reason: 'unsupported_platform',
       },
@@ -1088,11 +1099,15 @@ export function createMockClient(options: MockClientOptions = {}): AppRPCClient 
       destinationApproved = true;
     },
 
+    async revokeDestination(): Promise<void> {
+      destinationApproved = false;
+    },
+
     async testInferenceProvider(input: ProviderTestInput): Promise<ProviderTestResult> {
       const validation = validateEndpoint(input.endpoint);
       if (validation.ok === false) return { ok: false, error: 'configuration' };
       if (validation.requiresConsent) {
-        const fingerprint = destinationFingerprint(validation.baseUrl, input.model);
+        const fingerprint = await destinationFingerprint(validation.baseUrl, input.model);
         if (!destinationApproved) return { ok: false, error: 'consent_required' };
         void fingerprint;
       }

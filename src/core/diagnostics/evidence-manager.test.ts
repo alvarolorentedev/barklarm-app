@@ -489,4 +489,87 @@ describe('EvidenceManager', () => {
     expect(manager.getSnapshot('a')).toEqual({ status: 'disabled' });
     expect(manager.isEnabled()).toBe(false);
   });
+
+  it('emits cleared after a failed collection is resolved', async () => {
+    const events: any[] = [];
+    const provider = providerFor(async () => {
+      throw new Error('collection failed');
+    });
+    const manager = new EvidenceManager({
+      enabled: true,
+      limits,
+      onEvent: (event) => events.push(event),
+    });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('a')).toEqual({ status: 'failed' });
+    manager.observe([success('a')]);
+    expect(events.some((event) => event.type === 'cleared' && event.observerId === 'a')).toBe(true);
+  });
+
+  it('survives a throwing event consumer', async () => {
+    const provider = providerFor(async () => draft());
+    const manager = new EvidenceManager({
+      enabled: true,
+      limits,
+      onEvent: () => {
+        throw new Error('consumer failed');
+      },
+    });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+    expect(manager.getSnapshot('a').status).toBe('available');
+  });
+
+  it('prunes expired evidence independently of snapshot reads and notifies consumers', async () => {
+    let clock = 1_000_000;
+    const events: any[] = [];
+    const provider = providerFor(async () => draft());
+    const manager = new EvidenceManager({
+      enabled: true,
+      limits,
+      now: () => new Date(clock),
+      onEvent: (event) => events.push(event),
+    });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+
+    clock += limits.cacheTtlMs + 1;
+    manager.prune();
+    expect(events.some((event) => event.type === 'cleared' && event.observerId === 'a')).toBe(true);
+    expect(manager.getSnapshot('a')).toEqual({ status: 'not_collected' });
+  });
+
+  it('notifies consumers when cache pressure evicts evidence', async () => {
+    const events: any[] = [];
+    const provider = providerFor(async (failureRef) => draft(failureRef.observerId));
+    const manager = new EvidenceManager({
+      enabled: true,
+      limits: { ...limits, cacheMaxEntries: 1 },
+      onEvent: (event) => events.push(event),
+    });
+    manager.setObservers([source('a', provider, 'scope-a'), source('b', provider, 'scope-b')]);
+    manager.observe([failure('a', '1'), failure('b', '2')]);
+    await manager.waitForIdle();
+    expect(events.some((event) => event.type === 'cleared')).toBe(true);
+  });
+
+  it('clears the previous evidence before manual recollection completes', async () => {
+    const events: any[] = [];
+    const provider = providerFor(async () => draft());
+    const manager = new EvidenceManager({
+      enabled: true,
+      limits,
+      onEvent: (event) => events.push(event),
+    });
+    manager.setObservers([source('a', provider)]);
+    manager.observe([failure('a', '1:1')]);
+    await manager.waitForIdle();
+    manager.recollect('a');
+    expect(events.some((event) => event.type === 'cleared' && event.observerId === 'a')).toBe(true);
+    expect(manager.getSnapshot('a').status).toBe('collecting');
+  });
 });

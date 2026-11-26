@@ -3,12 +3,13 @@ import { ManagedInferenceProvider } from './managed';
 import { InferenceError } from '../../../types/Intelligence';
 
 function response(status: number, body: unknown) {
+  const serialized = typeof body === 'string' ? body : JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (): null => null },
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(serialized.length) : null) },
     body: null as null,
-    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+    text: async () => serialized,
   };
 }
 
@@ -49,6 +50,24 @@ describe('managed inference provider', () => {
     const init = (fetchMock.mock.calls[0] as any[])[1];
     expect(init.headers.Authorization).toBe('Bearer token');
     expect(JSON.parse(init.body).chat_template_kwargs).toEqual({ enable_thinking: false });
+  });
+
+  it('maps a native inference-lease failure to a runtime failure', async () => {
+    const provider = new ManagedInferenceProvider(
+      {
+        ensure: async () => endpoint,
+        beginInference: async () => {
+          throw new Error('state_lock');
+        },
+      } as any,
+      { fetch: (async () => response(200, {})) as any }
+    );
+    await expect(
+      provider.infer(
+        { messages: [{ role: 'user', content: 'x' }], responseSchema: { type: 'object' }, maxOutputTokens: 256 },
+        new AbortController().signal
+      )
+    ).rejects.toMatchObject({ code: 'unavailable', analysisReason: 'runtime_failed' });
   });
 
   it('supports tokenizer calls and rejects unsupported tokenizers', async () => {

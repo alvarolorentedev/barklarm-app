@@ -1,4 +1,4 @@
-import { hashString } from './fingerprint';
+import { InferenceError } from '../../types/Intelligence';
 
 export type EndpointClass = 'loopback' | 'private' | 'remote';
 
@@ -73,8 +73,27 @@ export function validateEndpoint(raw: unknown): EndpointValidation {
   };
 }
 
-export function destinationFingerprint(baseUrl: string, model: string): string {
-  return hashString(`${baseUrl}|${String(model || '').trim()}`);
+/**
+ * Security-sensitive identity for consent and credential scoping. This is a
+ * cryptographic digest, not the FNV cache fingerprint. The `v2:` prefix makes
+ * every older approval/key unmatchable; users re-approve and re-enter keys.
+ */
+export async function destinationFingerprint(baseUrl: string, model: string): Promise<string> {
+  const validation = validateEndpoint(baseUrl);
+  if (validation.ok === false) {
+    throw new InferenceError('configuration', validation.reason);
+  }
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) {
+    // Security identity must fail closed when a secure digest is unavailable.
+    throw new InferenceError('configuration', 'secure_identity_unavailable');
+  }
+  const canonical = `barklarm-destination-v2\n${validation.fingerprintSeed}\n${String(model || '').trim()}`;
+  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(canonical));
+  const hex = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return `v2:${hex}`;
 }
 
 export function chatCompletionsUrl(baseUrl: string): string {

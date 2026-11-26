@@ -144,7 +144,7 @@ export const IntelligenceSettings = () => {
     }
   };
 
-  const keyFingerprint = () => {
+  const keyFingerprint = async () => {
     const validation = validateEndpoint(provider.endpoint);
     return validation.ok ? destinationFingerprint(validation.baseUrl, provider.model || '') : '';
   };
@@ -152,7 +152,7 @@ export const IntelligenceSettings = () => {
   const saveKey = async () => {
     if (!apiKey.trim()) return;
     try {
-      await client.setProviderKey(apiKey.trim(), keyFingerprint());
+      await client.setProviderKey(apiKey.trim(), await keyFingerprint());
       setApiKey('');
       setKeySaved(true);
       setMessage(translate('API key stored in the operating system credential store.'));
@@ -163,7 +163,7 @@ export const IntelligenceSettings = () => {
 
   const forgetKey = async () => {
     try {
-      await client.deleteProviderKey(keyFingerprint());
+      await client.deleteProviderKey(await keyFingerprint());
       setKeySaved(false);
       setApiKey('');
       setMessage(translate('API key removed.'));
@@ -194,10 +194,21 @@ export const IntelligenceSettings = () => {
     const validation = validateEndpoint(provider.endpoint);
     if (validation.ok === false) return;
     try {
-      await client.approveDestination(destinationFingerprint(validation.baseUrl, provider.model || ''));
+      await client.approveDestination(await destinationFingerprint(validation.baseUrl, provider.model || ''));
       await refreshStatus();
     } catch {
       setMessage(translate('The destination could not be approved.'));
+    }
+  };
+
+  const revokeDestination = async () => {
+    const validation = validateEndpoint(provider.endpoint);
+    if (validation.ok === false) return;
+    try {
+      await client.revokeDestination(await destinationFingerprint(validation.baseUrl, provider.model || ''));
+      await refreshStatus();
+    } catch {
+      setMessage(translate('The destination approval could not be revoked.'));
     }
   };
 
@@ -467,10 +478,13 @@ export const IntelligenceSettings = () => {
               </p>
               {status.consentRequired ? (
                 status.destinationApproved ? (
-                  <p className="intelligence-approved">
+                  <div className="intelligence-approved">
                     <ShieldCheck size={14} aria-hidden="true" />
                     {translate('Destination approved for this model.')}
-                  </p>
+                    <button type="button" className="button" onClick={() => void revokeDestination()}>
+                      {translate('Revoke approval')}
+                    </button>
+                  </div>
                 ) : (
                   <div className="intelligence-warning">
                     <p>

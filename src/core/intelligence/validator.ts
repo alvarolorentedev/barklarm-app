@@ -216,6 +216,13 @@ export function validateAnalysis(raw: string, input: AnalysisValidationInput): A
     if (likelyCauses.length > 0) errors.push('insufficient_with_causes');
     if (uncertainty.length === 0) errors.push('insufficient_without_uncertainty');
   }
+  if (
+    evidenceSufficiency === 'limited' &&
+    likelyCauses.some((cause) => cause.certainty === 'supported') &&
+    uncertainty.length === 0
+  ) {
+    errors.push('limited_supported_without_uncertainty');
+  }
 
   if (errors.length > 0) return { ok: false, errors: Array.from(new Set(errors)) };
 
@@ -227,6 +234,13 @@ export function validateAnalysis(raw: string, input: AnalysisValidationInput): A
     evidenceSufficiency,
     uncertainty,
   };
+
+  // Re-scan the parsed and control-stripped representation. JSON escaping and
+  // control-character transformations can hide a secret or command from the
+  // raw-string scan above.
+  const normalized = JSON.stringify(draft);
+  if (containsRecognizableSecret(normalized)) return { ok: false, errors: ['sensitive_output'] };
+  if (containsDangerousCommand(normalized)) return { ok: false, errors: ['unsafe_output'] };
 
   return {
     ok: true,

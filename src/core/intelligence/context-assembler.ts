@@ -16,6 +16,12 @@ export const INTELLIGENCE_LIMITS = {
   maxItems: 40,
   maxSummaryChars: 400,
   maxLimitations: 20,
+  // Must match the managed runtime's effective window.
+  minContextWindow: 2048,
+  maxContextWindow: 16384,
+  minOutputTokens: 256,
+  maxOutputTokens: 4096,
+  minEvidenceTokens: 256,
 };
 
 const METADATA_KEYS = new Set([
@@ -87,6 +93,52 @@ function positiveInteger(value: unknown, fallback: number, min: number, max: num
   return Math.min(max, Math.max(min, Math.round(number)));
 }
 
+export type EffectiveBudget = {
+  contextWindow: number;
+  maxOutputTokens: number;
+  promptOverheadTokens: number;
+  safetyTokens: number;
+  budgetTokens: number;
+};
+
+/**
+ * Normalizes a requested context/output pair against the managed runtime's
+ * effective window. Impossible pairs are reduced deterministically instead of
+ * producing a negative evidence budget.
+ */
+export function effectiveBudget(
+  contextWindow?: number,
+  maxOutputTokens?: number,
+  promptOverheadTokens?: number,
+  safetyTokens?: number
+): EffectiveBudget {
+  const context = positiveInteger(
+    contextWindow,
+    INTELLIGENCE_LIMITS.defaultContextWindow,
+    INTELLIGENCE_LIMITS.minContextWindow,
+    INTELLIGENCE_LIMITS.maxContextWindow
+  );
+  const overhead = positiveInteger(promptOverheadTokens, INTELLIGENCE_LIMITS.promptOverheadTokens, 0, 4096);
+  const safety = positiveInteger(safetyTokens, INTELLIGENCE_LIMITS.safetyTokens, 0, 2048);
+  const available = context - overhead - safety;
+  const output = Math.min(
+    positiveInteger(
+      maxOutputTokens,
+      INTELLIGENCE_LIMITS.defaultMaxOutputTokens,
+      INTELLIGENCE_LIMITS.minOutputTokens,
+      INTELLIGENCE_LIMITS.maxOutputTokens
+    ),
+    Math.max(INTELLIGENCE_LIMITS.minOutputTokens, available - INTELLIGENCE_LIMITS.minEvidenceTokens)
+  );
+  return {
+    contextWindow: context,
+    maxOutputTokens: output,
+    promptOverheadTokens: overhead,
+    safetyTokens: safety,
+    budgetTokens: Math.max(INTELLIGENCE_LIMITS.minEvidenceTokens, available - output),
+  };
+}
+
 function metadataFor(item: EvidenceItem): Record<string, string | number | boolean> | undefined {
   if (!item.metadata) return undefined;
   const output: Record<string, string | number | boolean> = {};
@@ -115,24 +167,16 @@ function normalizeForDedupe(value: string): string {
  * the same envelope and budget always produce the same context.
  */
 export function assembleContext(evidence: DiagnosticEvidence, options: ContextAssemblerOptions): AssembledContext {
-  const contextWindow = positiveInteger(options.contextWindow, INTELLIGENCE_LIMITS.defaultContextWindow, 2048, 32768);
-  const maxOutputTokens = positiveInteger(
+  const budget = effectiveBudget(
+    options.contextWindow,
     options.maxOutputTokens,
-    INTELLIGENCE_LIMITS.defaultMaxOutputTokens,
-    256,
-    4096
-  );
-  const promptOverhead = positiveInteger(
     options.promptOverheadTokens,
-    INTELLIGENCE_LIMITS.promptOverheadTokens,
-    0,
-    4096
+    options.safetyTokens
   );
-  const safety = positiveInteger(options.safetyTokens, INTELLIGENCE_LIMITS.safetyTokens, 0, 2048);
   const charsPerToken = Math.max(2, Number(options.charsPerToken) || INTELLIGENCE_LIMITS.charsPerToken);
   const maxItemChars = positiveInteger(options.maxItemChars, INTELLIGENCE_LIMITS.maxItemChars, 200, 8000);
-  const budgetTokens = Math.max(512, contextWindow - maxOutputTokens - promptOverhead - safety);
-  const budgetChars = Math.max(1500, Math.floor(budgetTokens * charsPerToken));
+  const budgetTokens = budget.budgetTokens;
+  const budgetChars = Math.max(512, Math.floor(budgetTokens * charsPerToken));
 
   const candidates: Candidate[] = [];
   const seenContent = new Set<string>();

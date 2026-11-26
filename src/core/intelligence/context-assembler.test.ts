@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DiagnosticEvidence } from '../../types/Diagnostics';
-import { assembleContext } from './context-assembler';
+import { assembleContext, effectiveBudget, INTELLIGENCE_LIMITS } from './context-assembler';
 import { PROMPT_VERSION } from './prompt';
 
 const evidence: DiagnosticEvidence = {
@@ -276,5 +276,75 @@ describe('context assembler', () => {
     const assembled = assemble();
     expect(assembled.payload.completeness).toBe('partial');
     expect(assembled.payload.limitations).toEqual(['logs_unavailable', 'content_truncated']);
+  });
+
+  it('normalizes impossible context/output pairs against the managed window', () => {
+    const minimum = effectiveBudget(1024, 4096);
+    expect(minimum.contextWindow).toBe(INTELLIGENCE_LIMITS.minContextWindow);
+    expect(minimum.maxOutputTokens).toBeGreaterThanOrEqual(INTELLIGENCE_LIMITS.minOutputTokens);
+    expect(minimum.budgetTokens).toBeGreaterThanOrEqual(INTELLIGENCE_LIMITS.minEvidenceTokens);
+
+    const maximum = effectiveBudget(999_999, 999_999);
+    expect(maximum.contextWindow).toBe(INTELLIGENCE_LIMITS.maxContextWindow);
+    expect(maximum.maxOutputTokens).toBe(INTELLIGENCE_LIMITS.maxOutputTokens);
+    expect(maximum.budgetTokens).toBeGreaterThan(0);
+  });
+
+  it('keeps unicode-heavy evidence bounded by characters and reports truncation', () => {
+    const unicode = assembleContext(
+      {
+        ...evidence,
+        items: [
+          {
+            id: 'log:unicode',
+            category: 'log',
+            title: 'Unicode',
+            content: '🚀 失败 '.repeat(1200),
+          },
+        ],
+      },
+      { promptVersion: PROMPT_VERSION, maxItemChars: 500 }
+    );
+    expect(unicode.payload.items[0].content.length).toBeLessThanOrEqual(INTELLIGENCE_LIMITS.maxItemChars);
+    expect(unicode.assembly.estimatedTokens).toBeGreaterThan(0);
+  });
+
+  it('omits an item that still exceeds the budget after content truncation', () => {
+    const assembled = assembleContext(
+      {
+        ...evidence,
+        summary: '',
+        limitations: [],
+        items: [
+          {
+            id: 'log:oversized',
+            category: 'log',
+            title: 'T'.repeat(200),
+            content: 'x'.repeat(4000),
+          },
+        ],
+      },
+      { promptVersion: PROMPT_VERSION, contextWindow: 2048, maxOutputTokens: 1024, maxItemChars: 4000 }
+    );
+    expect(assembled.assembly.includedEvidenceIds).toEqual([]);
+    expect(assembled.assembly.omittedEvidenceIds).toContain('log:oversized');
+  });
+
+  it('reports heavy truncation instead of pretending the evidence is complete', () => {
+    const many = assembleContext(
+      {
+        ...evidence,
+        items: Array.from({ length: 30 }, (_, index) => ({
+          id: `log:${index}`,
+          category: 'log' as const,
+          title: `Log ${index}`,
+          content: `unique failure line ${index} `.repeat(200),
+        })),
+      },
+      { promptVersion: PROMPT_VERSION, contextWindow: 2048, maxOutputTokens: 1024, maxItemChars: 500 }
+    );
+    expect(many.assembly.omittedEvidenceIds.length).toBeGreaterThan(0);
+    expect(many.assembly.truncatedEvidenceIds.length).toBeGreaterThan(0);
+    expect(many.assembly.estimatedTokens).toBeLessThanOrEqual(many.assembly.budgetTokens + 1);
   });
 });

@@ -1,0 +1,67 @@
+{
+  "synthetic": true,
+  "category": "contradictory-evidence",
+  "sourceType": "githubAction",
+  "observer": {
+    "id": "fixture-contradictory-evidence",
+    "type": "githubAction",
+    "alias": "Nightly tests",
+    "owner": "acme",
+    "repo": "api",
+    "workflowId": "ci.yml",
+    "authToken": "ghp_SYNTHETICCONFIGTOKEN1234567890"
+  },
+  "failure": {
+    "failureId": "7012:1",
+    "link": "https://github.com/acme/api/actions/runs/7012"
+  },
+  "api": {
+    "runAttempt": {
+      "id": 7012,
+      "run_attempt": 1,
+      "name": "CI",
+      "status": "completed",
+      "conclusion": "failure",
+      "head_branch": "main",
+      "head_sha": "4f2c1ab",
+      "event": "push",
+      "created_at": "2026-01-15T10:00:00Z",
+      "run_started_at": "2026-01-15T10:00:05Z",
+      "updated_at": "2026-01-15T10:04:00Z",
+      "html_url": "https://github.com/acme/api/actions/runs/7012",
+      "repository": {
+        "full_name": "acme/api"
+      }
+    },
+    "jobs": {
+      "total_count": 1,
+      "jobs": [
+        {
+          "id": 8012,
+          "name": "build",
+          "conclusion": "failure",
+          "html_url": "https://github.com/acme/api/actions/runs/7012/job/8012",
+          "started_at": "2026-01-15T10:00:10Z",
+          "completed_at": "2026-01-15T10:03:00Z",
+          "steps": [
+            {
+              "number": 1,
+              "name": "checkout",
+              "conclusion": "success",
+              "started_at": "2026-01-15T10:01:00Z"
+            },
+            {
+              "number": 2,
+              "name": "Run build",
+              "conclusion": "failure",
+              "started_at": "2026-01-15T10:01:00Z"
+            }
+          ]
+        }
+      ]
+    },
+    "logs": {
+      "8012": "2026-01-15T10:01:00.0000000Z Run tests\nAll tests passed\nError: process exited with code 1\nProcess completed with exit code 1."
+    }
+  }
+}
