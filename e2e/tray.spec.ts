@@ -5,11 +5,17 @@ test('presents the compact tray radiator', async ({ page }) => {
   await page.goto('/?scenario=radiator-mixed&reset=1#/tray');
 
   await expect(page.locator('.tray-shell')).toBeVisible();
-  await expect(page.getByText('2 need attention')).toBeVisible();
-  await expect(page.locator('.radiator-health-line')).toContainText('3 healthy');
-  await expect(page.locator('.radiator-health-line')).toContainText('2 failed');
-  await expect(page.locator('.radiator-failure')).toHaveCount(2);
-  await expect(page.locator('.radiator-failure').first()).toContainText('CloudLink · CI');
+  await expect(page.locator('.tray-head')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Close' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Settings/ })).toBeVisible();
+  const summary = page.locator('.radiator-summary.is-compact');
+  await expect(summary).toContainText('3');
+  await expect(summary).toContainText('Healthy');
+  await expect(summary).toContainText('2');
+  await expect(summary).toContainText('Failed');
+  await expect(page.locator('.radiator-failure')).toHaveCount(0);
+  await expect(page.locator('.radiator-observer-row')).toHaveCount(7);
+  await expect(page.getByRole('button', { name: /CloudLink · CI/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open Barklarm' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Quit' })).toBeVisible();
 
@@ -21,6 +27,9 @@ test('presents the compact tray radiator', async ({ page }) => {
     );
   });
   expect(overflow).toBe(false);
+
+  await page.getByRole('button', { name: /CloudLink · CI/ }).click();
+  await expect(page.getByRole('heading', { name: 'CloudLink · CI' })).toBeVisible();
 });
 
 test('keeps failure detail and handoff inside the overlay', async ({ page }) => {
@@ -43,8 +52,9 @@ test('keeps healthy and empty tray states compact and useful', async ({ page }) 
   await page.setViewportSize({ width: 380, height: 240 });
   await page.goto('/?scenario=healthy&reset=1#/tray');
 
-  await expect(page.getByText('All healthy')).toBeVisible();
-  await expect(page.locator('.radiator-health-line')).toContainText('3 healthy');
+  const summary = page.locator('.radiator-summary.is-compact');
+  await expect(summary).toContainText('3');
+  await expect(summary).toContainText('Healthy');
   await expect(page.getByText('All monitored systems are healthy.')).toHaveCount(0);
   await expect(page.locator('.radiator-observer-row')).toHaveCount(3);
 

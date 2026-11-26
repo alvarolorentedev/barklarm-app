@@ -13,6 +13,15 @@ describe('observersfromLinkParser', () => {
       },
     ],
     [
+      'https://github.com/alvarolorentedev/opencode-mobile/actions/workflows/release.yml',
+      {
+        type: 'githubAction',
+        owner: 'alvarolorentedev',
+        repo: 'opencode-mobile',
+        workflowId: 'release.yml',
+      },
+    ],
+    [
       'https://api.travis-ci.com/repos/kanekotic/web-threads/cc.xml?branch=master',
       {
         type: 'ccTray',

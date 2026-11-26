@@ -80,13 +80,15 @@ export const Observers = ({
 
   return (
     <div className="observers">
-      <div className="observer-table">
-        <div className="observer-table-header">
-          <span className="col-name">{translate('Observer')}</span>
-          <span className="col-type">{translate('Type')}</span>
-          <span className="col-status">{translate('Status')}</span>
-          <span className="col-actions" />
-        </div>
+      <div className={`observer-table${observables.length === 0 ? ' is-empty' : ''}`}>
+        {observables.length > 0 ? (
+          <div className="observer-table-header">
+            <span className="col-name">{translate('Observer')}</span>
+            <span className="col-type">{translate('Type')}</span>
+            <span className="col-status">{translate('Status')}</span>
+            <span className="col-actions" />
+          </div>
+        ) : null}
 
         {observables.length === 0 ? (
           <div className="observer-first-run">

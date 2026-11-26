@@ -17,7 +17,9 @@ test('starts in an empty scenario without runtime errors', async ({ page }) => {
 test('navigates between radiator, observers and settings', async ({ page }) => {
   await page.goto('/?scenario=healthy&reset=1');
   await expect(page.getByRole('heading', { name: 'Radiator' })).toBeVisible();
-  await expect(page.getByText('All monitored systems are healthy.')).toBeVisible();
+  await expect(page.locator('.radiator-summary')).toContainText('3');
+  await expect(page.locator('.radiator-summary')).toContainText('Healthy');
+  await expect(page.locator('.radiator-observer-row')).toHaveCount(3);
 
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();

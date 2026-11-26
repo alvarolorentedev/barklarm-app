@@ -19,7 +19,7 @@ const shots: Shot[] = [
     path: '/?scenario=radiator-mixed&reset=1#/radiator',
     width: 860,
     height: 600,
-    ready: '.radiator-failure',
+    ready: '.radiator-summary',
   },
   {
     name: 'radiator-light-860',
@@ -27,14 +27,14 @@ const shots: Shot[] = [
     width: 860,
     height: 600,
     light: true,
-    ready: '.radiator-failure',
+    ready: '.radiator-summary',
   },
   {
     name: 'radiator-compact-720',
     path: '/?scenario=radiator-mixed&reset=1#/radiator',
     width: 720,
     height: 520,
-    ready: '.radiator-failure',
+    ready: '.radiator-summary',
   },
   {
     name: 'failure-detail-dark-860',
@@ -56,7 +56,7 @@ const shots: Shot[] = [
     path: '/?scenario=radiator-mixed&reset=1#/tray',
     width: 380,
     height: 520,
-    ready: '.radiator-failure',
+    ready: '.radiator-summary',
   },
   {
     name: 'tray-light-380',
@@ -64,7 +64,7 @@ const shots: Shot[] = [
     width: 380,
     height: 520,
     light: true,
-    ready: '.radiator-failure',
+    ready: '.radiator-summary',
   },
   {
     name: 'tray-detail-dark-380',
@@ -85,7 +85,7 @@ const shots: Shot[] = [
     path: '/?scenario=healthy&reset=1#/tray',
     width: 380,
     height: 240,
-    ready: 'text=All healthy',
+    ready: '.radiator-summary.is-compact',
   },
   {
     name: 'tray-empty-dark-380',
@@ -111,7 +111,8 @@ for (const shot of shots) {
   if (shot.path.includes('#/tray')) {
     const measured = await page.evaluate(() => {
       const content = document.querySelector<HTMLElement>('.tray-content');
-      return Math.min(520, Math.max(200, 86 + (content?.scrollHeight || 0)));
+      const footer = document.querySelector<HTMLElement>('.tray-footer');
+      return Math.min(520, Math.max(200, 20 + (content?.scrollHeight || 0) + (footer?.offsetHeight || 0)));
     });
     await page.setViewportSize({ width: shot.width, height: measured });
   }

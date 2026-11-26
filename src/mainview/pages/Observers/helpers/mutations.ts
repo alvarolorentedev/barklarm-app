@@ -16,11 +16,14 @@ export const mutations = (observables: any[], setObservables: any) => ({
     );
   },
   parseDataransfer: (dataTrasfer: DataTransfer) => {
-    if (!dataTrasfer.types.some((type: string) => type.includes('text'))) return;
-    const text = dataTrasfer.getData('Text');
-    observersfromLinkParser.forEach((parser) => {
-      if (!parser.canApply(text)) return;
-      setObservables([...observables, { ...parser.apply(text), id: createObserverId() }]);
-    });
+    if (!dataTrasfer.types.some((type: string) => type.toLowerCase().includes('text'))) return;
+    const text = ['text/uri-list', 'text/plain', 'Text']
+      .map((format) => dataTrasfer.getData(format).trim())
+      .find(Boolean);
+    if (!text) return;
+
+    const parser = observersfromLinkParser.find((candidate) => candidate.canApply(text));
+    if (!parser) return;
+    setObservables([...observables, { ...parser.apply(text), id: createObserverId() }]);
   },
 });

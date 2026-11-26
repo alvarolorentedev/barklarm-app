@@ -1289,6 +1289,12 @@ export function createMockClient(options: MockClientOptions = {}): AppRPCClient 
       const state = (config.observables || []).find((observer) => observer.id === observerId);
       return Boolean(state?.issueEndpoint && isHttpUrl(state.issueEndpoint));
     },
+    async getWindowMode() {
+      return 'tray' as const;
+    },
+    async onWindowModeChange(): Promise<() => void> {
+      return () => undefined;
+    },
     async openMainWindow(): Promise<void> {
       return undefined;
     },

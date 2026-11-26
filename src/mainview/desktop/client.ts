@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import {
@@ -41,7 +42,7 @@ import {
   ProviderTestResult,
 } from '../../types/Intelligence';
 import { State } from '../../types/State';
-import type { AppRPCClient } from '../runtime/types';
+import type { AppRPCClient, WindowMode } from '../runtime/types';
 import { openExternal as openExternalUrl, openIssue, setupAppMenu, TrayPresenter } from './tray';
 
 const noopPresenter: ObserverPresenter = {
@@ -584,6 +585,14 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       if (!isHttpUrl(endpoint)) return false;
       openIssue(state, endpoint);
       return true;
+    },
+
+    async getWindowMode(): Promise<WindowMode> {
+      return invoke<WindowMode>('get_window_mode');
+    },
+
+    async onWindowModeChange(handler: (mode: WindowMode) => void): Promise<() => void> {
+      return listen<WindowMode>('barklarm-window-mode', (event) => handler(event.payload));
     },
 
     async openMainWindow(): Promise<void> {

@@ -38,6 +38,8 @@ vi.mock('./rpc-client', () => ({
     testInferenceProvider: vi.fn(),
     writeClipboard: vi.fn(),
     openIssue: vi.fn(),
+    getWindowMode: vi.fn(),
+    onWindowModeChange: vi.fn(),
     openMainWindow: vi.fn(),
     hideWindow: vi.fn(),
     setTrayPanelHeight: vi.fn(),
@@ -125,6 +127,8 @@ describe('App', () => {
     mockClient.writeClipboard.mockResolvedValue(true);
     mockClient.openExternal.mockResolvedValue(true);
     mockClient.openIssue.mockResolvedValue(true);
+    mockClient.getWindowMode.mockResolvedValue('tray');
+    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);
@@ -152,12 +156,12 @@ describe('App', () => {
   it('renders the Radiator, opens a failure and focuses cited evidence', async () => {
     renderApp('/radiator');
 
-    const card = await screen.findByRole('article', { name: /CloudLink · CI/ });
-    expect(card).toHaveTextContent('Dependency installation failed.');
-    await waitFor(() => expect(card).toHaveTextContent('Likely cause'));
-    expect(card).toHaveTextContent('Next step');
+    expect(await screen.findByLabelText('System health')).toHaveTextContent('Failed');
+    expect(screen.queryByText('Likely cause')).not.toBeInTheDocument();
+    expect(screen.queryByText('Next step')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Details/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /CloudLink · CI/ }));
+
     expect(await screen.findByRole('heading', { name: 'What happened' })).toBeInTheDocument();
     expect(screen.getByText('Inspect the lockfile.')).toBeInTheDocument();
 
@@ -168,11 +172,13 @@ describe('App', () => {
   it('renders the compact tray overlay and keeps detail and handoff inside it', async () => {
     renderApp('/tray');
 
-    expect(await screen.findByText('1 needs attention')).toBeInTheDocument();
-    expect(screen.getAllByText('CloudLink · CI').length).toBeGreaterThan(0);
+    const summary = await screen.findByLabelText('System health');
+    expect(summary).toHaveClass('is-compact');
+    expect(summary).toHaveTextContent('Failed');
+    expect(screen.queryByText('Needs attention')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Radiator' })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Details/ })[0]);
+    fireEvent.click(screen.getByRole('button', { name: /CloudLink · CI/ }));
     expect(await screen.findByRole('heading', { name: 'What happened' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Preview prompt/ }));
@@ -183,19 +189,25 @@ describe('App', () => {
     expect(mockClient.writeClipboard).toHaveBeenCalledWith(expect.stringContaining('[UNTRUSTED EVIDENCE'));
   });
 
-  it('handles tray escape, close and settings actions', async () => {
+  it('handles tray escape and settings actions', async () => {
     renderApp('/tray');
-    await screen.findByText('1 needs attention');
+    await screen.findByRole('button', { name: /CloudLink · CI/ });
 
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(mockClient.hideWindow).toHaveBeenCalled();
+    expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(mockClient.hideWindow).toHaveBeenCalledTimes(2);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Settings/ }));
     await waitFor(() => expect(mockClient.openMainWindow).toHaveBeenCalled());
     expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  it('keeps the tray shell out of a main-mode window', async () => {
+    mockClient.getWindowMode.mockResolvedValue('main');
+    renderApp('/tray');
+
+    expect(await screen.findByRole('heading', { name: 'Radiator' })).toBeInTheDocument();
+    expect(screen.queryByText('Open Barklarm')).not.toBeInTheDocument();
   });
 
   it('renders compact healthy and empty tray states without the healthy panel', async () => {
@@ -203,9 +215,10 @@ describe('App', () => {
       { id: 'o1', name: 'Build', status: Status.SUCCESS, link: 'https://example.test' },
     ]);
     const { unmount } = renderApp('/tray');
-    expect(await screen.findByText('All healthy')).toBeInTheDocument();
-    expect(document.querySelector('.radiator-health-line')?.textContent).toContain('1');
-    expect(document.querySelector('.radiator-health-line')?.textContent).toContain('healthy');
+    const summary = await screen.findByLabelText('System health');
+    expect(summary).toHaveClass('is-compact');
+    expect(summary).toHaveTextContent('1');
+    expect(summary).toHaveTextContent('Healthy');
     expect(screen.queryByText('All monitored systems are healthy.')).not.toBeInTheDocument();
     unmount();
 
@@ -235,28 +248,13 @@ describe('tray and detail edge states', () => {
     mockClient.getObserverStates.mockResolvedValue([failureState]);
     mockClient.getDiagnosticEvidence.mockResolvedValue({ status: 'available', evidence });
     mockClient.getAnalysis.mockResolvedValue({ status: 'available', analysis });
+    mockClient.getWindowMode.mockResolvedValue('tray');
+    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);
     mockClient.writeClipboard.mockResolvedValue(true);
     mockClient.quit.mockResolvedValue(true);
-  });
-
-  it('describes checking and unavailable tray headers', async () => {
-    mockClient.getObserverStates.mockResolvedValue([
-      { id: 'o1', name: 'Checking build', status: Status.CHECKING, link: 'https://example.test' },
-    ]);
-    const first = renderApp('/tray');
-    await waitFor(() => expect(document.querySelector('.tray-head-status')?.textContent).toContain('Checking'));
-    first.unmount();
-
-    mockClient.getObserverStates.mockResolvedValue([
-      { id: 'o1', name: 'Unavailable build', status: Status.NA, link: 'https://example.test' },
-    ]);
-    renderApp('/tray');
-    await waitFor(() =>
-      expect(document.querySelector('.tray-head-status')?.textContent).toContain('No active failures')
-    );
   });
 
   it('handles missing and resolved tray failures', async () => {
@@ -289,6 +287,8 @@ describe('presentation edge states', () => {
     mockClient.getStore.mockImplementation((key: string) =>
       Promise.resolve(key === 'observables' ? configs : undefined)
     );
+    mockClient.getWindowMode.mockResolvedValue('tray');
+    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);
@@ -296,19 +296,24 @@ describe('presentation edge states', () => {
     mockClient.quit.mockResolvedValue(true);
   });
 
-  it('renders the full healthy and unresolved Radiator states', async () => {
+  it('renders the healthy and unresolved Radiator overview', async () => {
     mockClient.getObserverStates.mockResolvedValue([
       { id: 'o1', name: 'Build', status: Status.SUCCESS, link: 'https://example.test' },
     ]);
     const healthy = renderApp('/radiator');
-    expect(await screen.findByText('All monitored systems are healthy.')).toBeInTheDocument();
+    expect(await screen.findByText('CloudLink · CI')).toBeInTheDocument();
+    expect(screen.getByLabelText('System health')).toHaveTextContent('1');
+    expect(screen.getByLabelText('System health')).toHaveTextContent('Healthy');
+    expect(screen.queryByText('All monitored systems are healthy.')).not.toBeInTheDocument();
     healthy.unmount();
 
     mockClient.getObserverStates.mockResolvedValue([
       { id: 'o1', name: 'Build', status: Status.NA, link: 'https://example.test' },
     ]);
     renderApp('/radiator');
-    expect(await screen.findByText('No active failures')).toBeInTheDocument();
+    expect(await screen.findByText('CloudLink · CI')).toBeInTheDocument();
+    expect(screen.getByLabelText('System health')).toHaveTextContent('Unavailable');
+    expect(screen.queryByText('No active failures')).not.toBeInTheDocument();
   });
 
   it('does not claim a checking or unavailable observer resolved', async () => {

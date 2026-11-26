@@ -74,5 +74,34 @@ describe('mutations', () => {
         }),
       ]);
     });
+
+    it('reads a standard uri-list and adds the workflow observer', () => {
+      const url = 'https://github.com/alvarolorentedev/opencode-mobile/actions/workflows/release.yml';
+      const dataTransfer = {
+        types: ['text/uri-list'],
+        getData: (format: string) => (format === 'text/uri-list' ? `  ${url}  ` : ''),
+      };
+      mutationFunctions.parseDataransfer(dataTransfer);
+      expect(setObservablesMock).toBeCalledWith([
+        ...initialObservables,
+        expect.objectContaining({
+          type: 'githubAction',
+          owner: 'alvarolorentedev',
+          repo: 'opencode-mobile',
+          workflowId: 'release.yml',
+          id: expect.any(String),
+        }),
+      ]);
+    });
+
+    it('adds only one observer when more than one parser matches', () => {
+      const dataTransfer = {
+        types: ['text/plain'],
+        getData: () => 'https://sentry.io/organizations/acme/projects/web/',
+      };
+      mutationFunctions.parseDataransfer(dataTransfer);
+      expect(setObservablesMock).toHaveBeenCalledTimes(1);
+      expect(setObservablesMock.mock.calls[0][0]).toHaveLength(initialObservables.length + 1);
+    });
   });
 });

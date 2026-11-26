@@ -20,9 +20,10 @@ Phase 3 makes the tray the first surface and the full window the detailed surfac
 ## Goals
 
 1. One tray surface. Clicking the tray icon toggles a compact overlay; there is no separate right-click menu design.
-2. The overlay shows health, prioritized failures, diagnosis, next action and agent handoff without opening the app.
-3. The full window exposes a Radiator page with operational summary, failure cards, all observers and a focused
-   failure detail route with evidence.
+2. The overlay shows health counts and one row per observer. A failure opens diagnosis, next action and agent handoff
+   without opening the app.
+3. The full window exposes a Radiator page with operational summary and all observers, plus a focused failure detail
+   route with evidence.
 4. Observed status, diagnostic evidence, AI interpretation, recommendations and uncertainty remain visually distinct.
 5. A deterministic, sanitized, size-bounded agent prompt can be previewed and copied from the overlay and the app.
 6. Diagnostics and built-in intelligence can be activated contextually without a wizard or restart.
@@ -40,12 +41,13 @@ public README/website/marketing overhaul (Phase 5). No changes to the issue webh
 ### Surfaces
 
 1. **Tray icon:** operational status only; AI never changes its colour or icon.
-2. **Tray overlay:** a single 380 px wide borderless panel, content-sized between 200 and 520 px. Any supported tray
-   click toggles it. It hides on focus loss and Escape.
-3. **Overlay modes:** failure list, failure detail, prompt preview, healthy and empty. It includes Settings, Quit,
-   Open source, Open issue when configured, Details, Copy agent prompt and Open full details. If the full window is
-   already visible, a tray click focuses it instead of replacing it with the overlay; the overlay is not a second
-   simultaneous view.
+2. **Tray overlay:** a single 380 px wide popover-style panel with native macOS material, rounded corners and no
+   titlebar or close button. It is content-sized between 200 and 520 px, toggles from the tray icon, and hides on focus
+   loss or Escape.
+3. **Overlay modes:** overview, failure detail, prompt preview, healthy and empty. Footer rows expose the primary
+   action, Settings and Quit; failure detail also exposes Open source, Open issue when configured and Copy agent prompt.
+   If the full window is already visible, a tray click focuses it instead of replacing it with the overlay; the overlay
+   is not a second simultaneous view.
 4. **Linux fallback:** Tauri does not emit tray click events on Linux. A minimal native menu (`Open Barklarm`, `Quit`)
    is the platform fallback. The overlay is documented as unavailable there.
 5. **Full window:** `/radiator` default, `/radiator/observer/:id` detail, `/observers`, `/settings`, `/general`
@@ -58,9 +60,11 @@ public README/website/marketing overhaul (Phase 5). No changes to the issue webh
 2. NA is never counted as healthy. Empty, healthy, attention and unresolved (no failure but NA/CHECKING) states are
    distinct.
 3. Failures are ordered non-muted first, then configuration order; identities are stable observer IDs.
-4. Every failure card renders without evidence or analysis. Missing diagnosis never hides a failure.
-5. Cards show observer, integration, status, failure description, source timestamp when structured evidence provides
-   one, evidence/AI status, likely cause with certainty, and the first recommendation with citations.
+4. The overview renders all four operational counts and one row per observer. Failed rows open the failure detail;
+   missing diagnosis never hides a failure.
+5. Failure detail shows observer, integration, status, failure description, source timestamp when structured evidence
+   provides one, evidence/AI status, likely cause with certainty, and the first recommendation with citations. The
+   overview does not show diagnosis or recommendations.
 6. No numerical severity, uptime or last-success metrics are invented.
 
 ### Failure detail
@@ -114,10 +118,10 @@ Tray click -> TrayWindowController -> same main window, tray mode -> /tray route
                                           |
 StatusProvider (existing poll) -----------+--> pure radiator projection
                                           |       |
-                                          |       +--> overlay list/detail
+                                          |       +--> overlay overview
                                           |       +--> full Radiator
                                           |
-                                          +--> one snapshot coordinator (reads only)
+                                          +--> failure detail reads evidence/analysis
                                                    |
 EvidenceManager / AnalysisManager (unchanged) -----+
                                                    |
@@ -125,8 +129,8 @@ buildAgentHandoff (pure core) -> preview -> AppRPCClient.writeClipboard
 ```
 
 - Presentation is a read-only projection. It is not a second source of truth.
-- One coordinator fetches evidence/analysis for failures; no per-card polling. Reads never trigger collection or
-  inference. Explicit retry buttons remain user actions.
+- The overview reads only `State`. Failure detail fetches evidence/analysis for its selected failure; there is no
+  per-card polling. Reads never trigger collection or inference. Explicit retry buttons remain user actions.
 - The overlay is the existing window in a different mode, so there is exactly one renderer and one runtime. A second
   window would duplicate polling, evidence collection and inference unless orchestration moved out of the renderer.
 - Native window mode changes live behind `AppRPCClient`; React never imports Tauri.
@@ -183,7 +187,9 @@ app remains reachable. Rollback is reverting the change; no migration is involve
   are carried into Phase 4. Browser mocks are not evidence of native window or clipboard behaviour.
 - Linux keeps the native tray menu fallback because Tauri cannot emit tray click events there. macOS/Windows use the
   single overlay surface.
-- The overlay is borderless and square outside the content; rounded outer corners would require macOS private APIs.
+- The overlay uses a transparent window, native macOS `Popover` material, Windows Acrylic and a CSS fallback on Linux.
+  Rounded corners and the hairline border are CSS; the window mode is guarded so the tray shell cannot render in a
+  decorated main window.
 - Independent review resolutions: tray icons are decoded through the image pipeline instead of `fetch` under the
   production CSP, with a visible-window fallback if tray creation fails; handoff delimiters and source-derived metadata
   are contained in the untrusted block; focus-loss hiding is deferred briefly to avoid the Windows tray-toggle race;
@@ -192,6 +198,8 @@ app remains reachable. Rollback is reverting the change; no migration is involve
   recommendation; the full Radiator refresh checks observers; tray-to-main navigation uses replace semantics; native
   sizing uses physical units and resets maximized/minimized state; truncation cannot leak or misreport sections; and
   localization/shortcut gaps were closed.
+- Overview revision: the overlay and full Radiator now show operational counts plus observer rows. Top-level failure
+  cards, recommendations and the shared snapshot coordinator were removed; diagnosis and handoff live in failure detail.
 
 ## Open questions
 

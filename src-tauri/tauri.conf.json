@@ -21,7 +21,9 @@
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
+        "transparent": true,
         "backgroundThrottling": "disabled",
+        "dragDropEnabled": false,
         "devtools": false
       }
     ],

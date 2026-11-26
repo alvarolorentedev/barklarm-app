@@ -9,8 +9,8 @@ test('keeps the radiator and settings usable in Spanish', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Radiador', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Ajustes', exact: true })).toBeVisible();
   await expect(page.locator('.radiator-summary')).toContainText('Saludable');
-  await expect(page.locator('.radiator-failure').first()).toContainText('CloudLink · CI');
-  await expect(page.locator('.radiator-failure').first()).toContainText('Fallo');
+  await expect(page.locator('.radiator-observer-row').first()).toContainText('CloudLink · CI');
+  await expect(page.locator('.radiator-observer-row').first()).toContainText('Fallo');
 
   await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Ajustes' })).toBeVisible();

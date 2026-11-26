@@ -66,12 +66,15 @@ describe('Observers', () => {
     expect(screen.getByText('GitHub: build')).toBeInTheDocument();
     expect(screen.getByText('GitHub Actions')).toBeInTheDocument();
     expect(screen.getByText('Healthy')).toBeInTheDocument();
+    expect(document.querySelector('.observer-table-header')).toBeInTheDocument();
   });
 
-  it('renders the empty state and adds a new observer', () => {
+  it('renders the empty state without the table header and adds a new observer', () => {
     renderObservers([]);
 
     expect(screen.getByText('No observers yet')).toBeInTheDocument();
+    expect(document.querySelector('.observer-table-header')).not.toBeInTheDocument();
+    expect(document.querySelector('.observer-table')).toHaveClass('is-empty');
     fireEvent.click(screen.getByRole('button', { name: /New observer/i }));
 
     expect(add).toHaveBeenCalledWith({ type: '' });
@@ -109,6 +112,7 @@ describe('Observers', () => {
 
     expect(screen.getByText('GitHub: alpha')).toBeInTheDocument();
     expect(screen.queryByText('GitHub: beta')).not.toBeInTheDocument();
+    expect(document.querySelector('.observer-table-header')).toBeInTheDocument();
   });
 
   it('shows the diagnostic panel for an expanded failed observer', async () => {

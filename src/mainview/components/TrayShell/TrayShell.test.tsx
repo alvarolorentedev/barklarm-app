@@ -8,7 +8,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { client } from '../../rpc-client';
 import { TrayShell } from './index';
-import { Status } from '../../../types/Status';
 
 vi.mock('../../rpc-client', () => ({
   client: {
@@ -17,13 +16,6 @@ vi.mock('../../rpc-client', () => ({
     hideWindow: vi.fn(),
     quit: vi.fn(),
   },
-}));
-
-vi.mock('../../status-context', () => ({
-  useStatus: () => ({
-    states: [{ id: 'o1', name: 'Build', status: Status.SUCCESS, link: '' }],
-    loading: false,
-  }),
 }));
 
 const mockClient = client as any;
@@ -60,10 +52,10 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(386));
+    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(320));
   });
 
-  it('hides the overlay on Escape and on the close button', async () => {
+  it('hides the overlay on Escape without a custom close button', async () => {
     render(
       <MemoryRouter initialEntries={['/tray']}>
         <TrayShell>
@@ -74,10 +66,8 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
-    expect(mockClient.hideWindow).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(mockClient.hideWindow).toHaveBeenCalledTimes(2);
+    expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
   });
 });

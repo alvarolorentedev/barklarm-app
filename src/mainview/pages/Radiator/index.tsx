@@ -3,14 +3,12 @@ import { Plus, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildRadiatorModel } from '../../../core/presentation/radiator';
 import { Status } from '../../../types/Status';
-import { FailureCard } from '../../components/radiator/FailureCard';
 import { AllObserversList } from '../../components/radiator/AllObserversList';
 import { StatusSummary } from '../../components/radiator/StatusSummary';
 import { translate } from '../../i18n';
 import { client } from '../../rpc-client';
 import { useStatus } from '../../status-context';
 import { useObservables } from './use-observables';
-import { useRadiatorData } from './use-radiator-data';
 
 type Filter = 'all' | 'failed' | 'healthy' | 'other' | 'muted';
 
@@ -25,12 +23,11 @@ const FILTER_LABEL: Record<Filter, string> = {
 export const Radiator = () => {
   const { states, loading, refresh } = useStatus();
   const observables = useObservables();
-  const { snapshots, reload } = useRadiatorData(states);
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('all');
   const [refreshing, setRefreshing] = useState(false);
 
-  const model = useMemo(() => buildRadiatorModel(states, observables, snapshots), [states, observables, snapshots]);
+  const model = useMemo(() => buildRadiatorModel(states, observables), [states, observables]);
 
   const filteredObservers = useMemo(() => {
     if (filter === 'all') return model.observers;
@@ -47,7 +44,6 @@ export const Radiator = () => {
     try {
       await client.refreshObservers();
       await refresh();
-      reload();
     } finally {
       setRefreshing(false);
     }
@@ -108,54 +104,6 @@ export const Radiator = () => {
               {translate('Muted failures stay visible and keep their operational status.')}
             </p>
           ) : null}
-
-          {model.health === 'attention' ? (
-            <section className="radiator-section" aria-labelledby="needs-attention">
-              <div className="radiator-section-head">
-                <h2 id="needs-attention" className="radiator-section-title">
-                  <span className="status-dot failure" aria-hidden="true" />
-                  {translate('Needs attention')}
-                </h2>
-                <span className="radiator-section-count">
-                  {model.failures.length} {translate(model.failures.length === 1 ? 'failure' : 'failures')}
-                </span>
-              </div>
-              <div className="radiator-failure-list">
-                {model.failures.map((failure) => (
-                  <FailureCard
-                    key={failure.failureKey}
-                    failure={failure}
-                    onOpenDetails={() => navigate(`/radiator/observer/${encodeURIComponent(failure.observerId)}`)}
-                  />
-                ))}
-              </div>
-            </section>
-          ) : model.health === 'healthy' ? (
-            <section className="radiator-calm" aria-label={translate('System health')}>
-              <span className="radiator-calm-mark" aria-hidden="true">
-                ✓
-              </span>
-              <div>
-                <h2>{translate('All monitored systems are healthy.')}</h2>
-                <p>
-                  {model.summary.total}{' '}
-                  {translate(model.summary.total === 1 ? 'observer checked.' : 'observers checked.')}{' '}
-                  {translate('Nothing needs your attention right now.')}
-                </p>
-              </div>
-              <button type="button" className="button" onClick={() => navigate('/observers')}>
-                {translate('Manage observers')}
-              </button>
-            </section>
-          ) : (
-            <section className="radiator-unresolved" aria-label={translate('System health')}>
-              <h2>{translate('No active failures')}</h2>
-              <p>
-                {model.summary.checking + model.summary.unavailable}{' '}
-                {translate('sources are still checking or unavailable.')}
-              </p>
-            </section>
-          )}
 
           <section className="radiator-section" aria-labelledby="all-observers">
             <div className="radiator-section-head">

@@ -78,10 +78,13 @@ New integrations follow that shape; they do not add switches to core.
 - The default full-window route is `/radiator`; `/radiator/observer/:id` is the failure detail, `/observers` and
   `/settings` remain. `/general` redirects to `/settings`.
 - Clicking the tray icon toggles one compact overlay (`/tray`, `/tray/observer/:id`, `/tray/handoff/:id`). It is the
-  same hidden main window in tray mode, resized to 380 px and content-sized between 200 and 520 px. This avoids a
-  second renderer and duplicate polling, evidence collection or inference.
-- `useRadiatorData` is the single read-only snapshot coordinator for the overlay/full failure list. It discards stale
-  results by observer/failure identity and polls only transient states. It never schedules collection or analysis.
+  same hidden main window in tray mode, resized to 380 px and content-sized between 200 and 520 px. Tray mode applies
+  native window material, rounded corners and no window chrome; restoring main mode clears the effect. This avoids a
+  second renderer and duplicate polling, evidence collection or inference. A window-mode guard keeps `/tray` routes out
+  of the decorated main window.
+- The overlay and full Radiator overview read only `State`; failure detail loads its own evidence/analysis snapshots,
+  discards stale results by observer/failure identity and polls only transient states. Reads never schedule collection
+  or analysis.
 - `src/core/presentation/radiator.ts` derives counts, deterministic ordering and health state from existing contracts.
 - `src/core/handoff.ts` composes a deterministic, sanitized, bounded prompt. Trusted instructions and untrusted
   evidence are separated; stale analysis is never included. The desktop runtime exposes clipboard writes behind

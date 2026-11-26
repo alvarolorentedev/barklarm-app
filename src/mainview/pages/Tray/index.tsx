@@ -5,7 +5,6 @@ import { buildRadiatorModel } from '../../../core/presentation/radiator';
 import { Status } from '../../../types/Status';
 import { useAnalysisSnapshot, useDiagnosticSnapshot } from '../../components/Diagnostics/hooks';
 import { DiagnosisSetup } from '../../components/radiator/DiagnosisSetup';
-import { FailureCard } from '../../components/radiator/FailureCard';
 import { HandoffCopyButton, HandoffSection } from '../../components/radiator/Handoff';
 import { AllObserversList } from '../../components/radiator/AllObserversList';
 import { StatusSummary } from '../../components/radiator/StatusSummary';
@@ -19,28 +18,33 @@ import { client } from '../../rpc-client';
 import { useStatus } from '../../status-context';
 import { useObservables } from '../Radiator/use-observables';
 import { useIssueEndpoint } from '../Radiator/use-issue-endpoint';
-import { useRadiatorData } from '../Radiator/use-radiator-data';
 
-const TrayFooter = ({ primary, onPrimary, onQuit }: { primary: string; onPrimary: () => void; onQuit: () => void }) => (
-  <footer className="tray-footer">
-    <button type="button" className="button primary" onClick={onPrimary}>
-      {primary}
-    </button>
-    <span className="tray-footer-spacer" />
-    <button type="button" className="tray-footer-link" onClick={onQuit}>
-      {translate('Quit')}
-    </button>
-  </footer>
-);
+const TrayFooter = ({ primary, onPrimary, onQuit }: { primary: string; onPrimary: () => void; onQuit: () => void }) => {
+  const actions = useTrayActions();
+
+  return (
+    <footer className="tray-footer">
+      <button type="button" className="tray-action-row is-primary" onClick={onPrimary}>
+        <span>{primary}</span>
+        <ChevronRight size={11} aria-hidden="true" />
+      </button>
+      <button type="button" className="tray-action-row" onClick={() => void actions.openMain('/settings')}>
+        {translate('Settings')}…
+      </button>
+      <button type="button" className="tray-action-row" onClick={onQuit}>
+        {translate('Quit')}
+      </button>
+    </footer>
+  );
+};
 
 export const TrayRadiator = () => {
   const { states, loading } = useStatus();
   const observables = useObservables();
-  const { snapshots } = useRadiatorData(states);
   const navigate = useNavigate();
   const actions = useTrayActions();
 
-  const model = useMemo(() => buildRadiatorModel(states, observables, snapshots), [states, observables, snapshots]);
+  const model = useMemo(() => buildRadiatorModel(states, observables), [states, observables]);
 
   if (loading && states.length === 0) {
     return (
@@ -92,26 +96,6 @@ export const TrayRadiator = () => {
       <div className="tray-scroll">
         <div className="tray-content">
           <StatusSummary summary={model.summary} compact />
-          {model.failures.length > 0 ? (
-            <>
-              <div className="tray-section-head">
-                <span className="tray-section-title">
-                  <span className="status-dot failure" aria-hidden="true" />
-                  {translate('Needs attention')}
-                </span>
-              </div>
-              <div className="tray-failure-list">
-                {model.failures.map((failure) => (
-                  <FailureCard
-                    key={failure.failureKey}
-                    failure={failure}
-                    compact
-                    onOpenDetails={() => navigate(`/tray/observer/${encodeURIComponent(failure.observerId)}`)}
-                  />
-                ))}
-              </div>
-            </>
-          ) : null}
 
           <div className="tray-section-head">
             <span className="tray-section-title">{translate('All observers')}</span>

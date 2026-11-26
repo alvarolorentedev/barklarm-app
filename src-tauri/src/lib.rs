@@ -4,7 +4,12 @@ mod store;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
-use tauri::{Manager, PhysicalPosition, PhysicalSize, WindowEvent};
+#[cfg(target_os = "windows")]
+use tauri::utils::WindowEffect;
+use tauri::utils::config::WindowEffectsConfig;
+#[cfg(target_os = "macos")]
+use tauri::utils::{WindowEffect, WindowEffectState};
+use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WindowEvent};
 
 static MENU_IMAGES_OK: AtomicBool = AtomicBool::new(false);
 static TRAY_MODE: AtomicBool = AtomicBool::new(false);
@@ -65,8 +70,29 @@ fn apply_tray_position(
     Ok(())
 }
 
+fn apply_tray_window_effects(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        let effects = WindowEffectsConfig {
+            effects: vec![WindowEffect::Popover],
+            state: Some(WindowEffectState::Active),
+            ..Default::default()
+        };
+        let _ = window.set_effects(Some(effects));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let effects = WindowEffectsConfig {
+            effects: vec![WindowEffect::Acrylic],
+            ..Default::default()
+        };
+        let _ = window.set_effects(Some(effects));
+    }
+}
+
 fn restore_main_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     TRAY_MODE.store(false, Ordering::Relaxed);
+    let _ = window.set_effects(None::<WindowEffectsConfig>);
     let _ = window.unminimize();
     window.set_decorations(true)?;
     window.set_always_on_top(false)?;
@@ -83,6 +109,7 @@ fn restore_main_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
     window.center()?;
     window.show()?;
     window.set_focus()?;
+    let _ = window.emit("barklarm-window-mode", "main");
     Ok(())
 }
 
@@ -244,8 +271,10 @@ fn show_tray_panel(
     let height = *TRAY_HEIGHT.lock().map_err(|error| error.to_string())?;
     apply_tray_position(&window, anchor, clamp_tray_height(height))
         .map_err(|error| error.to_string())?;
+    apply_tray_window_effects(&window);
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
+    let _ = window.emit("barklarm-window-mode", "tray");
     Ok(())
 }
 

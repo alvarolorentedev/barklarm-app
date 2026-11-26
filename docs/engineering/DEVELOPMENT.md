@@ -122,6 +122,13 @@ http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-
 In the native app, clicking the menu-bar icon toggles one overlay. There is no second right-click menu design on
 macOS/Windows. Linux keeps a minimal native menu fallback because Tauri cannot emit tray click events there.
 
+Keep `dragDropEnabled: false` on the main Tauri window. The Observers page adds a source by dropping a link and uses
+HTML5 drag and drop; Tauri's native handler consumes the drop and no native listener is registered.
+
+The main window is created transparent so tray mode can apply the native `Popover` material (Acrylic on Windows) in
+`show_tray_panel`; `restore_main_window` clears the effect. The opaque app shell covers the main window, so keep its
+background and the `html[data-runtime='mock']` fallback if you change the theme tokens.
+
 ### Visual capture
 
 `bun run dev:mock` must already be running. Capture synthetic screenshots with:

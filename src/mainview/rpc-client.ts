@@ -59,6 +59,8 @@ export const client: AppRPCClient = {
   testInferenceProvider: (input) => call((runtime) => runtime.testInferenceProvider(input)),
   writeClipboard: (text) => call((runtime) => runtime.writeClipboard(text)),
   openIssue: (observerId) => call((runtime) => runtime.openIssue(observerId)),
+  getWindowMode: () => call((runtime) => runtime.getWindowMode()),
+  onWindowModeChange: (handler) => call((runtime) => runtime.onWindowModeChange(handler)),
   openMainWindow: () => call((runtime) => runtime.openMainWindow()),
   hideWindow: () => call((runtime) => runtime.hideWindow()),
   setTrayPanelHeight: (height) => call((runtime) => runtime.setTrayPanelHeight(height)),

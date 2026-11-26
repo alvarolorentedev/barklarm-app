@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Activity, List, Settings as SettingsIcon } from 'lucide-react';
 import { AppShell } from './components/AppShell';
 import { TrayShell } from './components/TrayShell';
@@ -11,6 +11,8 @@ import { TrayFailureDetail, TrayHandoff, TrayRadiator } from './pages/Tray';
 import { SearchProvider } from './search-context';
 import { StatusProvider } from './status-context';
 import { translate } from './i18n';
+import { client } from './rpc-client';
+import type { WindowMode } from './runtime/types';
 
 const menuRoutes = [
   {
@@ -56,6 +58,38 @@ const trayRoutes = (
 
 const AppContent = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const pathname = React.useRef(location.pathname);
+  pathname.current = location.pathname;
+
+  React.useEffect(() => {
+    let disposed = false;
+    let stop: (() => void) | undefined;
+    const guard = (mode: WindowMode) => {
+      // HashRouter updates the hash before React commits the navigation, so the
+      // main-mode event cannot clobber an intentional /settings or detail route.
+      const route = window.location.hash.startsWith('#/') ? window.location.hash.slice(1) : pathname.current;
+      if (mode === 'main' && route.startsWith('/tray')) {
+        navigate('/radiator', { replace: true });
+      }
+    };
+    void client
+      .getWindowMode()
+      .then(guard)
+      .catch(() => undefined);
+    void client
+      .onWindowModeChange(guard)
+      .then((unlisten) => {
+        if (disposed) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      stop?.();
+    };
+  }, [navigate]);
+
   const tray = location.pathname.startsWith('/tray');
   if (tray) return <TrayShell>{trayRoutes}</TrayShell>;
   return (

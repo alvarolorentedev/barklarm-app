@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const radiator = '/?scenario=radiator-mixed&reset=1#/radiator';
 const detail = '/?scenario=radiator-mixed&reset=1#/radiator/observer/mock-mixed-ci';
 
-test('presents system health and prioritized failures', async ({ page }) => {
+test('presents system health and the observer list', async ({ page }) => {
   await page.goto(radiator);
 
   await expect(page.getByRole('heading', { name: 'Radiator' })).toBeVisible();
@@ -13,16 +13,17 @@ test('presents system health and prioritized failures', async ({ page }) => {
   await expect(summary).toContainText('2');
   await expect(summary).toContainText('Failed');
 
-  const failures = page.locator('.radiator-failure');
-  await expect(failures).toHaveCount(2);
-  const first = failures.first();
-  await expect(first).toContainText('CloudLink · CI');
-  await expect(first).toContainText('Dependency installation failed.');
-  await expect(first).toContainText('Likely cause');
-  await expect(first).toContainText('Next step');
-  await expect(first.locator('.status-pill.failure')).toBeVisible();
-  await expect(failures.nth(1)).toContainText('Muted');
-  await expect(page.locator('.radiator-observer-row')).toHaveCount(7);
+  const rows = page.locator('.radiator-observer-row');
+  await expect(rows).toHaveCount(7);
+  await expect(rows.first()).toContainText('CloudLink · CI');
+  await expect(rows.first().locator('.status-pill.failure')).toBeVisible();
+  await expect(rows.nth(2)).toContainText('Muted');
+  await expect(page.locator('.radiator-failure')).toHaveCount(0);
+  await expect(page.getByText('Likely cause')).toHaveCount(0);
+  await expect(page.getByText('Next step')).toHaveCount(0);
+
+  await page.getByRole('button', { name: /CloudLink · CI/ }).click();
+  await expect(page.getByRole('heading', { name: 'CloudLink · CI' })).toBeVisible();
 });
 
 test('opens a failure detail and navigates from a citation to evidence', async ({ page }) => {

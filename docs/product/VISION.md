@@ -15,8 +15,8 @@ coding-agent handoff.
 
 ## Phase 3: the radiator experience
 
-Barklarm 4.0 puts the radiator first. Clicking the menu-bar icon opens a compact overlay with operational health,
-prioritized failures, the likely cause when a validated analysis exists, the next useful action and a deterministic
+Barklarm 4.0 puts the radiator first. Clicking the menu-bar icon opens a compact overlay with operational counts and
+one row per observer; a failure opens a focused detail with the likely cause, the next useful action and a deterministic
 coding-agent handoff. The full window remains the detailed surface for evidence, citations, observers and settings.
 
 The overlay is one tray surface, not a left-click view plus a separate right-click menu design. Linux keeps a native

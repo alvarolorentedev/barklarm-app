@@ -64,7 +64,7 @@ See [spec 0003](../specs/0003-intelligence-hardening.md).
 Goal: make the tray the first surface and the full window the detailed surface.
 
 - [x] One tray overlay toggled by a tray click; no separate right-click menu design on macOS/Windows.
-- [x] Compact operational summary, prioritized failures, diagnosis and next action in the overlay.
+- [x] Compact operational summary and observer list in the overlay; diagnosis and next action in failure detail.
 - [x] Full Radiator page, failure detail, evidence citations and agent handoff.
 - [x] Deterministic, sanitized, size-bounded coding-agent prompt with preview and explicit clipboard copy.
 - [x] Contextual diagnostics and built-in intelligence activation without a wizard or restart.

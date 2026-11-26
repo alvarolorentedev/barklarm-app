@@ -38,6 +38,33 @@ test('persists general settings across a reload', async ({ page }) => {
   await expect(page.getByRole('switch', { name: 'Disable SSL verification' })).toBeChecked();
 });
 
+test('adds an observer by dropping a workflow link', async ({ page }) => {
+  const url = 'https://github.com/alvarolorentedev/opencode-mobile/actions/workflows/release.yml';
+  await page.goto('/?scenario=empty&reset=1');
+  await page.getByRole('button', { name: 'Observers', exact: true }).click();
+
+  await page.evaluate((droppedUrl) => {
+    const box = document.querySelector('[data-testid="box"]');
+    if (!box) throw new Error('Observers page not found');
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/uri-list', droppedUrl);
+    box.dispatchEvent(new DragEvent('dragenter', { bubbles: true, cancelable: true, dataTransfer }));
+  }, url);
+
+  await expect(page.locator('.dropzone')).toBeVisible();
+  await page.evaluate((droppedUrl) => {
+    const dropzone = document.querySelector('.dropzone');
+    if (!dropzone) throw new Error('Drop zone not found');
+    const dataTransfer = new DataTransfer();
+    dataTransfer.setData('text/uri-list', droppedUrl);
+    dropzone.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer }));
+  }, url);
+
+  await expect(page.locator('.observer-name-text')).toHaveText([
+    'GitHub: alvarolorentedev/opencode-mobile/release.yml',
+  ]);
+});
+
 test('adds a configured observer and restores it after reload', async ({ page }) => {
   await page.goto('/?scenario=empty');
   await page.getByRole('button', { name: 'Observers', exact: true }).click();

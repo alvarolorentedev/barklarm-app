@@ -11,7 +11,6 @@ import { DiagnosticAnalysis } from '../../../types/Intelligence';
 import { State } from '../../../types/State';
 import { Status } from '../../../types/Status';
 import { client } from '../../rpc-client';
-import { FailureCard } from './FailureCard';
 import { HandoffCopyButton, HandoffSection } from './Handoff';
 import { DiagnosisSetup } from './DiagnosisSetup';
 import { StatusSummary } from './StatusSummary';
@@ -115,91 +114,6 @@ describe('radiator components', () => {
     mockClient.openExternal.mockResolvedValue(true);
   });
 
-  it('renders a complete failure card and copies the handoff', async () => {
-    const onOpen = vi.fn();
-    render(<FailureCard failure={failure()} onOpenDetails={onOpen} />);
-
-    expect(screen.getByText('Production build')).toBeInTheDocument();
-    expect(screen.getByText('GitHub Actions')).toBeInTheDocument();
-    expect(screen.getByText('Dependency installation failed.')).toBeInTheDocument();
-    expect(screen.getByText('A peer dependency conflicts.')).toBeInTheDocument();
-    expect(screen.getByText('Inspect the lockfile.')).toBeInTheDocument();
-    expect(screen.getByText('hypothesis')).toBeInTheDocument();
-    expect(screen.getByText(/investigate/)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /Details/ }));
-    expect(onOpen).toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: /Copy prompt/ }));
-    await screen.findByText('Prompt copied. Pasting elsewhere may transmit it.');
-    expect(mockClient.writeClipboard).toHaveBeenCalledWith(expect.stringContaining('[TRUSTED TASK]'));
-  });
-
-  it('renders card variants without evidence and for muted failures', () => {
-    const { rerender } = render(
-      <FailureCard
-        failure={failure({
-          evidence: undefined,
-          analysis: undefined,
-          evidenceStatus: 'collecting',
-          analysisStatus: 'waiting_for_evidence',
-        })}
-        onOpenDetails={() => undefined}
-      />
-    );
-    expect(screen.getByText(/Collecting evidence/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Copy prompt/ })).toBeDisabled();
-
-    rerender(
-      <FailureCard
-        failure={failure({
-          muted: true,
-          evidenceStatus: 'unsupported',
-          analysisStatus: 'disabled',
-          validAnalysis: undefined,
-          analysis: undefined,
-          cause: undefined,
-          recommendation: undefined,
-        })}
-        onOpenDetails={() => undefined}
-      />
-    );
-    expect(screen.getByText('Muted')).toBeInTheDocument();
-    expect(screen.getByText(/No detailed evidence for this source/)).toBeInTheDocument();
-    expect(screen.getByText(/AI off/)).toBeInTheDocument();
-  });
-
-  it('shows a concise summary when no cause is available', () => {
-    const withoutCause = analysis.likelyCauses[0];
-    render(
-      <FailureCard
-        failure={failure({
-          validAnalysis: { ...analysis, likelyCauses: [], recommendations: [] },
-          cause: undefined,
-          recommendation: undefined,
-        })}
-        onOpenDetails={() => undefined}
-      />
-    );
-    expect(screen.getByText('AI summary')).toBeInTheDocument();
-    expect(screen.getByText('Dependencies could not be resolved.')).toBeInTheDocument();
-    expect(withoutCause.description).toBeTruthy();
-  });
-
-  it('opens safe source links and hides unsafe ones', () => {
-    const { rerender } = render(<FailureCard failure={failure()} onOpenDetails={() => undefined} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open source' }));
-    expect(mockClient.openExternal).toHaveBeenCalledWith(state.link);
-
-    rerender(
-      <FailureCard
-        failure={failure({ link: 'https://user:pass@example.test/build' })}
-        onOpenDetails={() => undefined}
-      />
-    );
-    expect(screen.queryByRole('button', { name: 'Open source' })).not.toBeInTheDocument();
-  });
-
   it('renders compact and full summaries', () => {
     const summary = {
       total: 4,
@@ -209,16 +123,18 @@ describe('radiator components', () => {
       checking: 1,
       unavailable: 0,
     };
-    const { rerender } = render(<StatusSummary summary={summary} />);
+    const { container, rerender } = render(<StatusSummary summary={summary} />);
     expect(screen.getByLabelText('System health')).toHaveTextContent('2');
     expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(container.querySelector('.radiator-summary')).not.toHaveClass('is-compact');
 
     rerender(<StatusSummary summary={summary} compact />);
+    expect(container.querySelector('.radiator-summary')).toHaveClass('is-compact');
     expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getByText('1 muted')).toBeInTheDocument();
+    expect(screen.queryByText('1 muted')).not.toBeInTheDocument();
   });
 
-  it('renders observer rows and opens failures', () => {
+  it('renders observer rows, opens failures and links healthy sources', () => {
     const onOpen = vi.fn();
     render(
       <AllObserversList
@@ -233,7 +149,8 @@ describe('radiator components', () => {
     fireEvent.click(screen.getByRole('button', { name: /Failed one/ }));
     expect(onOpen).toHaveBeenCalledWith('a');
     expect(screen.getByText('Healthy one')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Healthy one/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open latest result: Healthy one' }));
+    expect(mockClient.openExternal).toHaveBeenCalledWith(state.link);
   });
 
   it('explains diagnosis setup states', () => {
@@ -399,83 +316,54 @@ describe('compact status variants', () => {
     mockClient.writeClipboard.mockResolvedValue(true);
   });
 
-  it('renders the compact healthy summary without zero categories', () => {
+  it('renders all four compact summary counts including zero', () => {
     render(
       <StatusSummary
         compact
         summary={{ total: 2, healthy: 2, failed: 0, mutedFailures: 0, checking: 0, unavailable: 0 }}
       />
     );
-    expect(document.querySelector('.radiator-health-line')?.textContent).toContain('2');
-    expect(document.querySelector('.radiator-health-line')?.textContent).toContain('healthy');
-    expect(document.querySelector('.radiator-health-line')?.textContent).not.toContain('failed');
+    expect(document.querySelector('.radiator-summary.is-compact')).toBeInTheDocument();
+    expect(document.querySelectorAll('.radiator-summary-cell')).toHaveLength(4);
+    expect(screen.getByText('Healthy')).toBeInTheDocument();
+    expect(screen.getByText('Failed')).toBeInTheDocument();
+    expect(screen.getByText('Checking')).toBeInTheDocument();
+    expect(screen.getByText('Unavailable')).toBeInTheDocument();
+    expect(screen.queryByText('muted')).not.toBeInTheDocument();
   });
 
-  it('renders each compact evidence and analysis status', () => {
-    const cases: Array<[any, any, string, string]> = [
-      ['queued', 'queued', 'Collecting evidence…', 'Analyzing…'],
-      ['partial', 'available', 'Evidence partial', 'AI diagnosis'],
-      ['unavailable', 'insufficient_evidence', 'Evidence unavailable', 'Not enough evidence'],
-      ['failed', 'failed', 'Evidence collection failed', 'Analysis failed'],
-      ['not_collected', 'runtime_unavailable', 'Waiting for evidence', 'AI unavailable'],
-      ['disabled', 'disabled', 'Diagnostics off', 'AI off'],
-      ['unsupported', 'waiting_for_evidence', 'No detailed evidence for this source', ''],
-      [undefined, undefined, 'Checking evidence…', ''],
-    ];
-
-    const { rerender } = render(
-      <FailureCard
-        failure={failure({
-          evidence: undefined,
-          analysis: undefined,
-          validAnalysis: undefined,
-          cause: undefined,
-          recommendation: undefined,
-        })}
-        onOpenDetails={() => undefined}
-        compact
-      />
-    );
-    for (const [evidenceStatus, analysisStatus, evidenceCopy, analysisCopy] of cases) {
-      rerender(
-        <FailureCard
-          compact
-          failure={failure({
-            evidence: undefined,
-            analysis: undefined,
-            evidenceStatus,
-            analysisStatus,
-            validAnalysis: undefined,
-            cause: undefined,
-            recommendation: undefined,
-          })}
-          onOpenDetails={() => undefined}
-        />
-      );
-      const card = document.querySelector('.radiator-failure') as HTMLElement;
-      expect(card.textContent).toContain(evidenceCopy);
-      if (analysisCopy) expect(card.textContent).toContain(analysisCopy);
-      if (analysisStatus === 'waiting_for_evidence') expect(card.textContent).not.toContain('Waiting for AI');
-    }
-  });
-
-  it('renders compact observer rows and invalid source links', () => {
+  it('keeps compact observer rows in-app and hides external links', () => {
     render(
       <AllObserversList
         compact
         observers={[
           { observerId: 'a', name: 'Build', type: 'githubAction', status: Status.FAILURE, muted: false, state },
+          { observerId: 'b', name: 'Healthy', type: 'sentry', status: Status.SUCCESS, muted: false, state },
         ]}
         onOpenFailure={() => undefined}
       />
     );
     expect(screen.getByText('Build')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Open latest result/ })).not.toBeInTheDocument();
+  });
 
-    const { unmount } = render(
-      <FailureCard failure={failure({ link: 'not-a-url' })} onOpenDetails={() => undefined} />
+  it('hides unsafe latest-result links in the full list', () => {
+    render(
+      <AllObserversList
+        observers={[
+          {
+            observerId: 'b',
+            name: 'Healthy',
+            type: 'sentry',
+            status: Status.SUCCESS,
+            muted: false,
+            state: { ...state, link: 'https://user:pass@example.test/build' },
+          },
+        ]}
+        onOpenFailure={() => undefined}
+      />
     );
-    expect(screen.queryByRole('button', { name: 'Open source' })).not.toBeInTheDocument();
-    unmount();
+    expect(screen.queryByRole('button', { name: /Open latest result/ })).not.toBeInTheDocument();
   });
 });
 

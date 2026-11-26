@@ -15,35 +15,8 @@ export const StatusSummary = ({ summary, compact = false }: StatusSummaryProps) 
     { key: 'unavailable', count: summary.unavailable, label: translate('Unavailable'), dot: 'idle' },
   ];
 
-  if (compact) {
-    const compactLabels: Record<string, { one: string; other: string }> = {
-      healthy: { one: translate('healthy source'), other: translate('healthy sources') },
-      failed: { one: translate('failed source'), other: translate('failed sources') },
-      checking: { one: translate('checking source'), other: translate('checking sources') },
-      unavailable: { one: translate('unavailable source'), other: translate('unavailable sources') },
-    };
-    return (
-      <p className="radiator-health-line" aria-label={translate('System health')}>
-        {items
-          .filter((item) => item.count > 0)
-          .map((item) => (
-            <span key={item.key}>
-              <span className={`status-dot ${item.dot}`} aria-hidden="true" />
-              <strong>{item.count}</strong>{' '}
-              {item.count === 1 ? compactLabels[item.key].one : compactLabels[item.key].other}
-            </span>
-          ))}
-        {summary.mutedFailures > 0 ? (
-          <span className="radiator-muted-note">
-            {summary.mutedFailures} {translate(summary.mutedFailures === 1 ? 'muted source' : 'muted sources')}
-          </span>
-        ) : null}
-      </p>
-    );
-  }
-
   return (
-    <div className="radiator-summary" aria-label={translate('System health')}>
+    <div className={`radiator-summary${compact ? ' is-compact' : ''}`} aria-label={translate('System health')}>
       {items.map((item) => (
         <div className="radiator-summary-cell" key={item.key}>
           <div className={`radiator-summary-value ${item.key === 'failed' && item.count > 0 ? 'is-failed' : ''}`}>
