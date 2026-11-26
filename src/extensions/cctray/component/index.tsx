@@ -12,6 +12,7 @@ export const CCTray = ({ observable, index, updateFieldWithValue, translate }: a
     <TextField
       label={translate('Project')}
       variant="standard"
+      placeholder="application / *"
       value={observable.name}
       onChange={(event: React.ChangeEvent<HTMLInputElement>) => updateFieldWithValue('name', index, event.target.value)}
     />

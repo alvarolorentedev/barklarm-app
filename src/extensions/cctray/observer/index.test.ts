@@ -12,6 +12,19 @@ vi.mock('../../fetch-adapter', () => {
   };
 });
 
+const projectXml = (
+  name: string,
+  lastBuildStatus: string,
+  {
+    activity = 'Sleeping',
+    webUrl = 'https://ci.example.test/build',
+    lastBuildTime = '2005-09-28T10:30:34.6362160+01:00',
+  }: { activity?: string; webUrl?: string; lastBuildTime?: string } = {}
+) =>
+  `<Project name="${name}" activity="${activity}" lastBuildStatus="${lastBuildStatus}" lastBuildLabel="8" lastBuildTime="${lastBuildTime}" nextBuildTime="2005-10-04T14:31:52.4509248+01:00" webUrl="${webUrl}"/>`;
+
+const projectsXml = (...projects: string[]) => `<Projects>${projects.join('')}</Projects>`;
+
 describe('CCTray', () => {
   describe('getState', () => {
     let config: CCTrayConfiguration;
@@ -282,47 +295,134 @@ describe('CCTray', () => {
       });
     });
 
-    it('shoulds return SUCCESS status if request return xml with non defined name should return first of the list', async () => {
-      const expectUrl = faker.internet.url();
-      const expectedResponseText = ` <Projects>
-            <Project
-                name="unselected-test-1"
-                activity="Sleeping"
-                lastBuildStatus="Success"
-                lastBuildLabel="8"
-                lastBuildTime="2005-09-28T10:30:34.6362160+01:00"
-                nextBuildTime="2005-10-04T14:31:52.4509248+01:00"
-                webUrl="${expectUrl}"/>
-            <Project
-                name="unselected-test-2"
-                activity="Sleeping"
-                lastBuildStatus="Failure"
-                lastBuildLabel="8"
-                lastBuildTime="2005-09-28T10:30:34.6362160+01:00"
-                nextBuildTime="2005-10-04T14:31:52.4509248+01:00"
-                webUrl="http://randomurl.com"/>
-            <Project
-            name="unselected-test-3"
-            activity="Sleeping"
-            lastBuildStatus="Failure"
-            lastBuildLabel="8"
-            lastBuildTime="2005-09-28T10:30:34.6362160+01:00"
-            nextBuildTime="2005-10-04T14:31:52.4509248+01:00"
-            webUrl="http://randomurl.com"/>
-        </Projects>`;
+    it('should aggregate every project when no project is specified', async () => {
+      const failingUrl = faker.internet.url();
+      const failingBuildTime = '2026-11-26T09:00:00.0000000+01:00';
       fetchtMock.mockResolvedValue({
-        text: () => Promise.resolve(expectedResponseText),
+        text: () =>
+          Promise.resolve(
+            projectsXml(
+              projectXml('application / Build', 'Success'),
+              projectXml('application / Test', 'Failure', {
+                webUrl: failingUrl,
+                lastBuildTime: failingBuildTime,
+              })
+            )
+          ),
         ok: true,
       });
-      (observer as any).projectName = undefined;
-      const result = await observer.getState();
-      expect(fetchtMock).toBeCalledWith(config.url, {
-        method: 'GET',
+      const result = await new CCTray({ ...config, name: undefined }).getState();
+      expect(result).toEqual({
+        name: config.alias,
+        status: Status.FAILURE,
+        link: failingUrl,
+        error: {
+          id: `application / Test_${failingBuildTime}`,
+          description: 'application / Test Build Failed',
+        },
       });
+    });
+
+    it('should match multiple projects with a wildcard and ignore the rest', async () => {
+      const failingUrl = faker.internet.url();
+      fetchtMock.mockResolvedValue({
+        text: () =>
+          Promise.resolve(
+            projectsXml(
+              projectXml('application / Build', 'Failure'),
+              projectXml('application / Test-unit', 'Success'),
+              projectXml('application / Test-e2e', 'Failure', { webUrl: failingUrl })
+            )
+          ),
+        ok: true,
+      });
+      const result = await new CCTray({ ...config, name: 'application / Test*' }).getState();
+      expect(result).toEqual({
+        name: config.alias,
+        status: Status.FAILURE,
+        link: failingUrl,
+        error: {
+          id: 'application / Test-e2e_2005-09-28T10:30:34.6362160+01:00',
+          description: 'application / Test-e2e Build Failed',
+        },
+      });
+    });
+
+    it('should match a wildcard in the middle of the project pattern', async () => {
+      fetchtMock.mockResolvedValue({
+        text: () =>
+          Promise.resolve(
+            projectsXml(projectXml('application / Build', 'Success'), projectXml('application / WebTests', 'Failure'))
+          ),
+        ok: true,
+      });
+      const result = await new CCTray({ ...config, name: 'application / *Test*' }).getState();
+      expect(result.status).toBe(Status.FAILURE);
+    });
+
+    it('should rank an unknown build above a building one', async () => {
+      const unknownUrl = faker.internet.url();
+      fetchtMock.mockResolvedValue({
+        text: () =>
+          Promise.resolve(
+            projectsXml(
+              projectXml('application / Build', 'Success', { activity: 'Building' }),
+              projectXml('application / Test', 'Unknown', { webUrl: unknownUrl })
+            )
+          ),
+        ok: true,
+      });
+      const result = await new CCTray({ ...config, name: 'application / *' }).getState();
+      expect(result).toEqual({
+        name: config.alias,
+        status: Status.NA,
+        link: unknownUrl,
+      });
+    });
+
+    it('should report every failed build when several match', async () => {
+      const firstTime = '2026-11-26T09:00:00.0000000+01:00';
+      const secondTime = '2026-11-26T10:00:00.0000000+01:00';
+      const firstUrl = faker.internet.url();
+      fetchtMock.mockResolvedValue({
+        text: () =>
+          Promise.resolve(
+            projectsXml(
+              projectXml('application / Test-unit', 'Failure', { webUrl: firstUrl, lastBuildTime: firstTime }),
+              projectXml('application / Test-e2e', 'Failure', { lastBuildTime: secondTime })
+            )
+          ),
+        ok: true,
+      });
+      const result = await new CCTray({ ...config, name: 'application / Test*' }).getState();
+      expect(result).toEqual({
+        name: config.alias,
+        status: Status.FAILURE,
+        link: firstUrl,
+        error: {
+          id: `application / Test-unit_${firstTime}, application / Test-e2e_${secondTime}`,
+          description: 'application / Test-unit, application / Test-e2e Build Failed',
+        },
+      });
+    });
+
+    it('should treat regex characters in the project pattern literally', async () => {
+      const successUrl = faker.internet.url();
+      fetchtMock.mockResolvedValue({
+        text: () =>
+          Promise.resolve(
+            projectsXml(
+              projectXml('application (v2) / [main] build', 'Success', { webUrl: successUrl }),
+              projectXml('application v2 / main build', 'Failure')
+            )
+          ),
+        ok: true,
+      });
+      const result = await new CCTray({ ...config, name: 'application (v2) / [main] *' }).getState();
       expect(result).toEqual({
         name: config.alias,
         status: Status.SUCCESS,
-        link: expectUrl,
+        link: successUrl,
       });
     });
   });

@@ -6,6 +6,8 @@ import { XMLParser } from 'fast-xml-parser';
 import { fetchWrapper } from '../../fetch-adapter';
 const fetch = fetchWrapper;
 
+const WORST_FIRST = [Status.FAILURE, Status.NA, Status.CHECKING, Status.SUCCESS];
+
 export class CCTray extends Observer {
   private readonly url: string;
   private readonly projectName: string;
@@ -28,11 +30,14 @@ export class CCTray extends Observer {
     });
   }
 
-  private getProject(projects: any | any[], projectName: string): any {
-    const projectsList = (Array.isArray(projects) ? projects : [projects]) || [];
-    if (!projectName) return projectsList[0];
-    return projectsList.find((project) => project.name === projectName);
+  /** Empty pattern matches every project; `*` matches any run of characters. */
+  private getProjects(projects: any | any[], projectName?: string): any[] {
+    const projectsList = (Array.isArray(projects) ? projects : [projects]).filter(Boolean);
+    if (!projectName) return projectsList;
+    const pattern = new RegExp(`^${projectName.replace(/[.+^${}()|[\]\\?]/g, '\\$&').replace(/\*+/g, '.*')}$`);
+    return projectsList.filter((project) => pattern.test(project.name));
   }
+
   public async getState(): Promise<State> {
     try {
       const response = await fetch(this.url, {
@@ -40,22 +45,24 @@ export class CCTray extends Observer {
       });
       if (!response.ok) throw new Error('response is invalid');
       const projects = this.parser.parse(await response.text()).Projects;
-      const { activity, lastBuildStatus, webUrl, name, lastBuildTime } = this.getProject(
-        projects.Project,
-        this.projectName
-      );
-      const status = this.getStatus(activity, lastBuildStatus);
+      const ranked = this.getProjects(projects.Project, this.projectName)
+        .map((project) => ({ project, status: this.getStatus(project.activity, project.lastBuildStatus) }))
+        .sort((a, b) => WORST_FIRST.indexOf(a.status) - WORST_FIRST.indexOf(b.status));
+      if (ranked.length === 0) throw new Error('no matching project');
+      const failedProjects = ranked.filter(({ status }) => status === Status.FAILURE).map(({ project }) => project);
+      const { project, status } = ranked[0];
       return {
         name: this.alias,
         status,
-        link: webUrl,
+        link: project.webUrl,
         muted: this.muted,
         issueEndpoint: this.issueEndpoint,
         error:
           status === Status.FAILURE
             ? {
-                id: `${name}_${lastBuildTime}`,
-                description: `${name} Build Failed`,
+                // The failure set is the event (ADR 0004), so a new failure notifies even while the aggregate stays red.
+                id: failedProjects.map(({ name, lastBuildTime }) => `${name}_${lastBuildTime}`).join(', '),
+                description: `${failedProjects.map(({ name }) => name).join(', ')} Build Failed`,
               }
             : undefined,
       };
@@ -70,6 +77,6 @@ export class CCTray extends Observer {
     }
   }
   private getStatus(activity: string, lastBuildStatus: string): Status {
-    return activity !== 'Sleeping' ? Status.CHECKING : this.statusMap[lastBuildStatus];
+    return activity !== 'Sleeping' ? Status.CHECKING : (this.statusMap[lastBuildStatus] ?? Status.NA);
   }
 }

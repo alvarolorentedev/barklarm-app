@@ -65,7 +65,7 @@ you configure. Evidence is sanitized and bounded; nothing is sent anywhere unles
 | | [Grafana](https://www.barklarm.com/docs/configuration) (alpha) |
 | | [Graylog](https://www.barklarm.com/docs/configuration) |
 
-CCTray support covers any server that exposes a `cc.xml` feed, so tools like Jenkins, TeamCity and other CCTray-compatible servers work without a Barklarm-specific plugin.
+CCTray support covers any server that exposes a `cc.xml` feed, so tools like Jenkins, TeamCity and other CCTray-compatible servers work without a Barklarm-specific plugin. Leave the project empty to monitor every project in the feed, or use `*` to match several builds with one observer (`application / Test*`); the observer shows the worst status of the matched builds.
 
 ## See it in action
 
