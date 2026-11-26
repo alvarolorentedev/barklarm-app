@@ -10,34 +10,38 @@ downloaded at runtime.
 
 | Target | Runtime asset | Managed AI | Validation performed |
 | --- | --- | --- | --- |
-| macOS arm64 | `llama-b12732-bin-macos-arm64` | Enabled after smoke test | Full local packaging, sidecar start, authenticated health check, real model inference and evaluations |
-| macOS x64 | `llama-b12732-bin-macos-x64` | Enabled only if CI smoke passes | Build/asset manifest only; not executed here |
-| Linux x64 | `llama-b12732-bin-ubuntu-x64` | Enabled only if CI smoke passes | Build/asset manifest only; not executed here |
-| Linux arm64 | `llama-b12732-bin-ubuntu-arm64` | Enabled only if CI smoke passes | Build/asset manifest only; not executed here |
-| Windows x64 | `llama-b12732-bin-win-cpu-x64` | Enabled only if CI smoke passes | Build/asset manifest only; not executed here |
+| macOS arm64 | `llama-b12732-bin-macos-arm64` | Enabled after smoke test | Full local packaging, serialized app-owned runtime start, loopback/auth checks, real structured inference, production validation, evaluations, graceful quit cleanup |
+| macOS x64 | `llama-b12732-bin-macos-x64` | Enabled only if CI smoke passes | Compilation/packaging workflow prepared; not executed here |
+| Linux x64 | `llama-b12732-bin-ubuntu-x64` | Enabled only if CI smoke passes | Compilation/packaging workflow prepared; not executed here |
+| Linux arm64 | `llama-b12732-bin-ubuntu-arm64` | Enabled only if CI smoke passes | Compilation/packaging workflow prepared; not executed here |
+| Windows x64 | `llama-b12732-bin-win-cpu-x64` | Enabled only if CI smoke passes | Compilation/packaging workflow prepared; not executed here |
 
 The application remains a traditional radiator on any target where the managed runtime is unavailable. Users can select a
 custom OpenAI-compatible provider or keep intelligence disabled.
 
 ## Runtime lifecycle
 
-- Lazy start on the first analysis; reuse across analyses.
-- Bind only to `127.0.0.1` on an available port.
-- Ephemeral bearer token written to a mode-0600 file, deleted after startup.
+- Serialized `stopped`/`starting`/`ready`/`stopping`/`failed` lifecycle; concurrent ensures coalesce.
+- Lazy start on the first analysis; reuse across analyses; restart on context change.
+- Bind only to `127.0.0.1` on an available port; auth + model-alias probe rejects an unrelated service.
+- Ephemeral bearer token created exclusively with mode 0600 via a file, deleted after startup.
 - Explicit argument allowlist; no web UI, slots, props, metrics, tools, model retrieval or filesystem features.
-- One parallel slot, bounded context and thread count.
-- Inactivity shutdown after five minutes; clean stop on disable or quit.
-- Bounded restart behavior and stale PID cleanup on the next launch.
+- One parallel slot, bounded context/thread count, 45 s per startup attempt with at most three attempts.
+- Active inference is protected from idle shutdown; inactivity stop after five minutes.
+- Identity-verified stale cleanup and bounded failure backoff.
 - Process output is discarded; no prompts or completions are logged.
+- Abrupt termination can leave a child until the next launch verifies and cleans it; unverifiable markers are discarded
+  without signalling.
 
 ## Measured resources (macOS arm64, 16 GB)
 
 | Measurement | Value |
 | --- | --- |
 | Model file | 1.1 GB (Q4_K_M) |
-| Runtime RSS, idle sample | ~305 MB |
-| Runtime RSS, generation sample | ~530 MB |
-| Warm analysis latency | ~6–24 s per fixture |
+| Runtime RSS after real generation (mmap included) | ~2.1 GB virtual/RSS sample |
+| Cold runtime start (real model smoke) | 13.1 s |
+| Cold inference (first real eval case) | 11.9 s |
+| Warm inference (later real eval cases) | ~9.3 s mean |
 | Context | 8192 tokens |
 | Output budget | 1536 tokens |
 

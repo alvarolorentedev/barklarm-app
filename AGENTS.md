@@ -51,6 +51,8 @@ proposing a new boundary; add one when a consequential decision changes.
 | `bun run test:evals:mock`                        | Deterministic diagnostic evaluations without a model                                    |
 | `bun run test:evals:local`                       | Explicit real-model evaluation; never part of standard CI                               |
 | `bun run sidecar:fetch`                          | Fetch and verify the pinned llama.cpp runtime for the current target                    |
+| `bun run sidecar:smoke`                          | Lightweight binary-availability check                                                   |
+| `bun run sidecar:smoke:runtime`                  | Opt-in real runtime: hash, loopback, auth, inference, validation and cleanup             |
 | `bun run format:fix` / `lint:fix`                | Auto-fix local issues                                                                   |
 | `bun run rust:fmt` / `rust:clippy` / `rust:test` | Native checks (need a Rust toolchain)                                                   |
 | `bun run audit`                                  | High/critical production dependency audit                                               |

@@ -21,6 +21,10 @@ explicit approval.
 | 14  | Native-only behavior is validated by Rust checks and CI; it is never simulated into a false pass.                                              | CI `rust` job; release builds                     |
 | 15  | A behavior change updates the closest document; a boundary change adds an ADR.                                                                 | Pull request checklist                            |
 | 16  | Diagnostic collection is opt-in, non-blocking and bounded; it never changes operational status, notifications or outbound payloads.            | `evidence-manager` tests; Playwright scenarios     |
+| 17  | Desktop inference uses the injected Tauri HTTP transport; it never falls back to browser `fetch` and never inherits observer `sslDisabled`. | Transport tests; desktop client review |
+| 18  | Managed runtime start/stop is serialized; a stale marker alone never authorizes signalling a process.                                           | Rust lifecycle/identity tests; native smoke |
+| 19  | Model activation requires a manifest-bound record and a full SHA-256; lightweight status checks do not hash every refresh.                     | Rust verification tests; native smoke |
+| 20  | Evidence expiry/eviction/recollection invalidates analysis; retention is pruned independently of UI reads.                                       | Evidence/analysis tests |
 
 ## State boundaries
 
@@ -40,4 +44,6 @@ Do not merge these into one mutable object. Do not build incident management.
 - Diagnostic evidence is untrusted, sanitized, bounded and memory-only. It is sent only to the selected inference
   provider after opt-in; never persisted, exported, sent to telemetry or added to the webhook.
 - Model output is untrusted. Render as text, never HTML or executable content; never follow generated commands or URLs.
+- Inference transport is native (Tauri HTTP) under the production CSP; observer SSL compatibility never applies to inference.
+- Managed runtime ownership is identity-verified; model activation is manifest-bound.
 - Mock data is synthetic and must never read or write real configuration paths.
