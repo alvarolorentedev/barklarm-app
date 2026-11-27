@@ -240,7 +240,10 @@ fn show_tray_panel(
             x as f64 + width as f64 / 2.0,
             y as f64 + height as f64 / 2.0,
         )
-        .map_err(|error| error.to_string())?
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| window.primary_monitor().ok().flatten())
         .ok_or_else(|| "tray monitor is unavailable".to_string())?;
     let work = monitor.work_area();
     let anchor = TrayAnchor {
@@ -351,12 +354,6 @@ pub fn run() {
             }
 
             if let Some(window) = app.get_webview_window("main") {
-                #[cfg(debug_assertions)]
-                {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
-
                 let window_for_close = window.clone();
                 window.on_window_event(move |event| match event {
                     WindowEvent::CloseRequested { api, .. } => {

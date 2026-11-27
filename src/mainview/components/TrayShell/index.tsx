@@ -50,7 +50,8 @@ export const TrayShell = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     return () => {
-      // Leaving the tray route through history or a fallback must restore the main-window mode.
+      // StrictMode remounts effects, so only restore when the route actually left /tray.
+      if (window.location.hash.startsWith('#/tray')) return;
       void client.openMainWindow().catch((error) => console.error('Could not restore the main window:', error));
     };
   }, []);

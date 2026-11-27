@@ -23,8 +23,8 @@ bun run dev        # native Tauri app
 bun run dev:mock   # browser app with deterministic data
 ```
 
-`bun run dev` starts Vite on `127.0.0.1:1420` and then the Tauri shell. The window is hidden outside debug builds and
-the tray remains available.
+`bun run dev` starts Vite on `127.0.0.1:1420` and then the Tauri shell. The window starts hidden; click the Barklarm
+menu-bar icon to open the tray overlay.
 
 For managed inference, stage the pinned runtime once per target:
 
@@ -127,7 +127,8 @@ HTML5 drag and drop; Tauri's native handler consumes the drop and no native list
 
 The main window is created transparent so tray mode can apply the native `Popover` material (Acrylic on Windows) in
 `show_tray_panel`; `restore_main_window` clears the effect. The opaque app shell covers the main window, so keep its
-background and the `html[data-runtime='mock']` fallback if you change the theme tokens.
+background and the `html[data-runtime='mock']` fallback if you change the theme tokens. The tray icon uses the fixed
+`barklarm-tray` id so a dev page reload replaces it instead of leaving duplicate menu-bar icons.
 
 ### Visual capture
 

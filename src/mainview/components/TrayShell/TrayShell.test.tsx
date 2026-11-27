@@ -4,7 +4,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { MemoryRouter } from 'react-router-dom';
+import { HashRouter, MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { client } from '../../rpc-client';
 import { TrayShell } from './index';
@@ -69,5 +69,24 @@ describe('TrayShell', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not restore the main window on a StrictMode remount', async () => {
+    window.location.hash = '#/tray';
+    render(
+      <React.StrictMode>
+        <HashRouter>
+          <TrayShell>
+            <div className="tray-page">
+              <div className="tray-content" />
+            </div>
+          </TrayShell>
+        </HashRouter>
+      </React.StrictMode>
+    );
+
+    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalled());
+    expect(mockClient.openMainWindow).not.toHaveBeenCalled();
+    window.history.replaceState(null, '', window.location.pathname);
   });
 });

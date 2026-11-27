@@ -155,7 +155,7 @@ bun run build      # Tauri app and dmg, output in src-tauri/target/release/bundl
 
 Browser development needs no credentials, native dependencies or external services. Mock scenarios are selected with `?scenario=empty|healthy|failed-builds|running-builds|unavailable|multiple-failures|persistence|diagnostics-complete|diagnostics-partial|diagnostics-unavailable|diagnostics-multiple|diagnostics-unsupported|diagnostics-disabled|diagnostics-collecting|diagnostics-secrets`.
 
-Development builds show the settings window immediately so the UI can be inspected. Production builds start in the tray.
+Development and production builds both start hidden in the tray. Click the Barklarm menu-bar icon to open the overlay; use `Open Barklarm` to open the main window.
 
 See [AGENTS.md](AGENTS.md) for the repository guide, [CONTRIBUTING.md](CONTRIBUTING.md) for the contribution flow and [docs/engineering/DEVELOPMENT.md](docs/engineering/DEVELOPMENT.md) for detailed commands.
 

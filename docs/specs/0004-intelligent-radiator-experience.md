@@ -46,8 +46,8 @@ public README/website/marketing overhaul (Phase 5). No changes to the issue webh
    loss or Escape.
 3. **Overlay modes:** overview, failure detail, prompt preview, healthy and empty. Footer rows expose the primary
    action, Settings and Quit; failure detail also exposes Open source, Open issue when configured and Copy agent prompt.
-   If the full window is already visible, a tray click focuses it instead of replacing it with the overlay; the overlay
-   is not a second simultaneous view.
+   A tray click always opens the overlay, even when the full window is visible. The full window is only opened
+   explicitly from an overlay action; the overlay is not a second simultaneous view.
 4. **Linux fallback:** Tauri does not emit tray click events on Linux. A minimal native menu (`Open Barklarm`, `Quit`)
    is the platform fallback. The overlay is documented as unavailable there.
 5. **Full window:** `/radiator` default, `/radiator/observer/:id` detail, `/observers`, `/settings`, `/general`

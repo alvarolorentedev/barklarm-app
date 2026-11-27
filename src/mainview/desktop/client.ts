@@ -416,8 +416,6 @@ async function initialize(): Promise<void> {
     manager.start(normalizeRefreshInterval(config.refreshInterval));
     await manager.refreshObservers(config.observables || []);
     await applyAutostart();
-
-    if (import.meta.env.DEV) await invoke('show_window');
   })();
   return readyPromise;
 }

@@ -100,10 +100,7 @@ async function toggleTrayPanel(event: {
       await invoke('hide_window');
       return;
     }
-    if (mode === 'main') {
-      await invoke('show_window');
-      return;
-    }
+    // A tray click always opens the overlay, even when the main window is visible.
     if (!event.rect) return;
     window.location.hash = '#/tray';
     await invoke('show_tray_panel', {
@@ -115,6 +112,7 @@ async function toggleTrayPanel(event: {
   } catch (error) {
     // A window-position failure must never leave the user without a surface.
     console.error('Tray panel failed, opening the main window:', error);
+    void invoke('log_frontend', { message: `[tray] panel failed: ${String(error)}` }).catch(() => undefined);
     window.location.hash = '#/radiator';
     await invoke('show_window').catch(() => undefined);
   }
@@ -189,7 +187,10 @@ export class TrayPresenter implements ObserverPresenter {
 
     try {
       const menu = linux ? await presenter.buildMenu(initialStates) : undefined;
+      // A dev page reload creates a new JS context; replace the old native icon instead of stacking a duplicate.
+      await TrayIcon.removeById('barklarm-tray').catch(() => undefined);
       presenter.tray = await TrayIcon.new({
+        id: 'barklarm-tray',
         icon: presenter.icons[Status.NA],
         iconAsTemplate: false,
         showMenuOnLeftClick: linux,
