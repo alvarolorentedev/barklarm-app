@@ -43,6 +43,7 @@ vi.mock('./rpc-client', () => ({
     openMainWindow: vi.fn(),
     hideWindow: vi.fn(),
     setTrayPanelHeight: vi.fn(),
+    listBrowsers: vi.fn().mockResolvedValue([]),
     openExternal: vi.fn(),
     importConfig: vi.fn(),
     exportConfig: vi.fn(),

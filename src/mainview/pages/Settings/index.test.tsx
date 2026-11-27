@@ -7,6 +7,10 @@ import '@testing-library/jest-dom';
 import { Settings } from './index';
 import { expect, describe, it, vi } from 'vitest';
 
+const storageMocks = vi.hoisted(() => ({
+  saveBrowser: vi.fn(),
+}));
+
 vi.mock('../../rpc-client', () => ({
   client: {
     getStore: vi.fn().mockResolvedValue(undefined),
@@ -65,6 +69,12 @@ vi.mock('./helpers/storage', () => ({
     saveRefreshInterval: vi.fn(),
     getissueGlobalEndpoint: vi.fn().mockResolvedValue(''),
     saveissueGlobalEndpoint: vi.fn(),
+    getBrowser: vi.fn().mockResolvedValue(''),
+    saveBrowser: storageMocks.saveBrowser,
+    listBrowsers: vi.fn().mockResolvedValue([
+      { id: 'chrome', name: 'Google Chrome' },
+      { id: 'firefox', name: 'Firefox' },
+    ]),
     getAutostart: vi.fn().mockResolvedValue(true),
     saveAutostart: vi.fn(),
     getDiagnosticsEnabled: vi.fn().mockResolvedValue(false),
@@ -98,5 +108,21 @@ describe('Settings', () => {
     expect(toggle).not.toBeChecked();
     fireEvent.click(toggle);
     expect(toggle).toBeChecked();
+  });
+
+  it('chooses a browser and resets it to the system default', async () => {
+    render(<Settings />);
+    const select = screen.getByLabelText('Browser') as HTMLSelectElement;
+    await screen.findByRole('option', { name: 'Google Chrome' });
+    expect(select).toHaveValue('');
+    expect(screen.getByRole('option', { name: 'Firefox' })).toBeInTheDocument();
+
+    fireEvent.change(select, { target: { value: 'firefox' } });
+    expect(select).toHaveValue('firefox');
+    expect(storageMocks.saveBrowser).toHaveBeenCalledWith('firefox');
+
+    fireEvent.change(select, { target: { value: '' } });
+    expect(select).toHaveValue('');
+    expect(storageMocks.saveBrowser).toHaveBeenLastCalledWith('');
   });
 });

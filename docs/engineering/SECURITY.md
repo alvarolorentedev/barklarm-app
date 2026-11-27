@@ -191,6 +191,13 @@ man-in-the-middle attacks. It never affects inference: `createInferenceFetch` al
 hostnames. Do not enable it by default, in mock mode or in tests. A custom inference provider with an invalid
 certificate fails instead of silently downgrading.
 
+## Opening project links
+
+External links are restricted to `http`/`https`. The optional browser selection stores an OS-provided browser id
+(macOS bundle id, Windows executable path, Linux desktop app id) and the native `open_with_browser` command only
+launches an id that is currently detected as an installed web handler; the renderer cannot pass an arbitrary program.
+If the stored browser disappears, links fall back to the system default. The browser setting never leaves the device.
+
 ## Mock and test data
 
 Mock scenarios are synthetic. Playwright runs against the mock runtime. Never capture a real token, customer log or

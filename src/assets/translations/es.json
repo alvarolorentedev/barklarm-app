@@ -54,6 +54,8 @@
   "Monitoring": "Monitorización",
   "Refresh interval": "Intervalo de actualización",
   "Issue endpoint": "Endpoint de incidencias",
+  "Browser": "Navegador",
+  "System default": "Predeterminado del sistema",
   "Startup": "Inicio",
   "Start at login": "Iniciar al arrancar",
   "Disable SSL verification": "Desactivar verificación SSL",

@@ -41,4 +41,12 @@ futures-util = "0.3"
 objc2 = "0.6.5"
 objc2-foundation = "0.3.2"
 objc2-app-kit = "0.3.2"
+objc2-core-foundation = { version = "0.3.2", default-features = false, features = ["std", "CFArray", "CFString", "CFURL"] }
+objc2-core-services = { version = "0.3.2", default-features = false, features = ["std", "LaunchServices", "LSInfo"] }
 block2 = "0.6.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-registry = "0.6.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gio = "0.18"

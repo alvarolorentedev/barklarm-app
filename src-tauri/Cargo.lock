@@ -316,10 +316,13 @@ version = "4.0.0"
 dependencies = [
  "block2",
  "futures-util",
+ "gio",
  "keyring",
  "log",
  "objc2",
  "objc2-app-kit",
+ "objc2-core-foundation",
+ "objc2-core-services",
  "objc2-foundation",
  "rand 0.9.5",
  "reqwest 0.13.5",
@@ -337,6 +340,7 @@ dependencies = [
  "tauri-plugin-notification",
  "tauri-plugin-opener",
  "tokio",
+ "windows-registry",
 ]
 
 [[package]]
@@ -3024,6 +3028,16 @@ checksum = "ca347214e24bc973fc025fd0d36ebb179ff30536ed1f80252706db19ee452009"
 dependencies = [
  "objc2",
  "objc2-foundation",
+]
+
+[[package]]
+name = "objc2-core-services"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "583300ad934cba24ff5292aee751ecc070f7ca6b39a574cc21b7b5e588e06a0b"
+dependencies = [
+ "bitflags 2.13.2",
+ "objc2-core-foundation",
 ]
 
 [[package]]

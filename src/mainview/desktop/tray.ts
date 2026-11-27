@@ -9,6 +9,7 @@ import { translate } from '../../core/i18n';
 import { fetchWrapper } from '../../extensions/fetch-adapter';
 import { ObserverPresenter } from '../../core/observer-manager';
 import { buildIssuePayload, isHttpUrl } from '../../core/issue';
+import { trayTooltip } from '../../core/presentation/tray';
 
 import okIconUrl from '../../assets/ok_icon_big.png';
 import failIconUrl from '../../assets/fail_icon_big.png';
@@ -55,13 +56,24 @@ function showConfigureWindow(): void {
   openRoute('/radiator');
 }
 
-export function openExternal(url: string): void {
+export async function openExternal(url: string, browser = ''): Promise<boolean> {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
-    void openUrl(parsed.href);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    if (browser) {
+      try {
+        await invoke('open_with_browser', { url: parsed.href, browser });
+        return true;
+      } catch (error) {
+        // A stale setting must not turn Link into a dead button.
+        console.error('Configured browser failed, opening the default browser:', error);
+      }
+    }
+    await openUrl(parsed.href);
+    return true;
   } catch (error) {
     console.error('Failed to open URL:', error);
+    return false;
   }
 }
 
@@ -150,9 +162,11 @@ export class TrayPresenter implements ObserverPresenter {
   private menu: Menu | null = null;
   private states: State[] = [];
   private endpoint = '';
+  private browser = '';
   private icons: IconBytes;
   private readonly fallback: boolean;
   private queue: Promise<void> = Promise.resolve();
+  private tooltip = 'Barklarm';
 
   private constructor(icons: IconBytes, fallback: boolean) {
     this.icons = icons;
@@ -171,6 +185,7 @@ export class TrayPresenter implements ObserverPresenter {
     );
     presenter.states = initialStates;
     presenter.endpoint = endpoint;
+    presenter.tooltip = trayTooltip(initialStates);
 
     try {
       const menu = linux ? await presenter.buildMenu(initialStates) : undefined;
@@ -179,7 +194,7 @@ export class TrayPresenter implements ObserverPresenter {
         iconAsTemplate: false,
         showMenuOnLeftClick: linux,
         menu,
-        tooltip: 'Barklarm',
+        tooltip: presenter.tooltip,
         action: (event) => {
           if (event.type !== 'Click') return;
           if ('buttonState' in event && event.buttonState !== 'Up') return;
@@ -199,6 +214,10 @@ export class TrayPresenter implements ObserverPresenter {
     this.updateMenu(this.states);
   }
 
+  setBrowser(browser: string): void {
+    this.browser = browser;
+  }
+
   updateImage(state: State): void {
     this.enqueue(async () => {
       if (!this.tray) return;
@@ -208,14 +227,19 @@ export class TrayPresenter implements ObserverPresenter {
 
   updateMenu(states: State[]): void {
     this.states = states;
-    if (!linux) return;
     this.enqueue(async () => {
       if (!this.tray) return;
-      const menu = await this.buildMenu(states);
-      const previous = this.menu;
-      this.menu = menu;
-      await this.tray.setMenu(menu);
-      if (previous) await previous.close();
+      if (linux) {
+        const menu = await this.buildMenu(states);
+        const previous = this.menu;
+        this.menu = menu;
+        await this.tray.setMenu(menu);
+        if (previous) await previous.close();
+      }
+      const tooltip = trayTooltip(states);
+      if (tooltip === this.tooltip) return;
+      this.tooltip = tooltip;
+      await this.tray.setTooltip(tooltip);
     });
   }
 
@@ -234,7 +258,7 @@ export class TrayPresenter implements ObserverPresenter {
       if (state.status === Status.FAILURE && state.id) {
         submenuItems.push({ text: translate('Investigate failure'), action: () => openFailure(state) });
       }
-      submenuItems.push({ text: translate('Link'), action: () => openExternal(state.link) });
+      submenuItems.push({ text: translate('Link'), action: () => void openExternal(state.link, this.browser) });
       const endpoint = state.issueEndpoint || this.endpoint;
       if (state.status === Status.FAILURE && endpoint) {
         submenuItems.push({

@@ -5,6 +5,7 @@ export type BarklarmConfig = {
   observables?: ObserverConfiguration[];
   refreshInterval?: number;
   issueGlobalEndpoint?: string;
+  browser?: string;
   sslDisabled?: boolean;
   diagnosticsEnabled?: boolean;
   intelligenceMode?: IntelligenceMode;
@@ -25,6 +26,8 @@ export const DEFAULT_CONFIG: BarklarmConfig = {
   observables: [],
   refreshInterval: 60000,
   issueGlobalEndpoint: '',
+  // Empty means the system default browser.
+  browser: '',
   sslDisabled: false,
   // Opt-in: existing installations must not retrieve extra data until asked.
   diagnosticsEnabled: false,
@@ -58,6 +61,10 @@ export function normalizeIntelligenceProvider(value: unknown): CustomProviderCon
     maxOutputTokens: boundedInteger(source.maxOutputTokens, INTELLIGENCE_PROVIDER_DEFAULTS.maxOutputTokens, 256, 4096),
     timeoutMs: boundedInteger(source.timeoutMs, INTELLIGENCE_PROVIDER_DEFAULTS.timeoutMs, 10000, 300000),
   };
+}
+
+export function normalizeBrowser(value: unknown): string {
+  return boundedString(value, 1024);
 }
 
 export function normalizeRefreshInterval(value: unknown): number {
@@ -98,6 +105,7 @@ export function normalizeConfig(value: unknown): BarklarmConfig {
   return {
     ...DEFAULT_CONFIG,
     ...source,
+    browser: normalizeBrowser(source.browser),
     observables: normalizeObservables(source.observables),
     intelligenceMode: normalizeIntelligenceMode(source.intelligenceMode),
     intelligenceProvider: normalizeIntelligenceProvider(source.intelligenceProvider),

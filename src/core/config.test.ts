@@ -11,6 +11,13 @@ describe('config', () => {
   it('starts with no observers and a desktop-safe refresh interval', () => {
     expect(DEFAULT_CONFIG.observables).toEqual([]);
     expect(DEFAULT_CONFIG.refreshInterval).toBe(60000);
+    expect(DEFAULT_CONFIG.browser).toBe('');
+  });
+
+  it('normalizes the selected browser to a trimmed string', () => {
+    expect(normalizeConfig({ browser: '  firefox.desktop  ' }).browser).toBe('firefox.desktop');
+    expect(normalizeConfig({ browser: 42 }).browser).toBe('');
+    expect(normalizeConfig({}).browser).toBe('');
   });
 
   it('assigns unique IDs to legacy observers', () => {

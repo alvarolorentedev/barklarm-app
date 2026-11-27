@@ -1,3 +1,4 @@
+mod browser;
 mod intelligence;
 mod store;
 
@@ -314,6 +315,8 @@ pub fn run() {
             store::import_config,
             store::export_config,
             store::quit_app,
+            browser::list_browsers,
+            browser::open_with_browser,
             log_frontend,
             show_window,
             open_main_window,

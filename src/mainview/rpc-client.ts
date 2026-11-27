@@ -64,6 +64,7 @@ export const client: AppRPCClient = {
   openMainWindow: () => call((runtime) => runtime.openMainWindow()),
   hideWindow: () => call((runtime) => runtime.hideWindow()),
   setTrayPanelHeight: (height) => call((runtime) => runtime.setTrayPanelHeight(height)),
+  listBrowsers: () => call((runtime) => runtime.listBrowsers()),
   openExternal: (url) => call((runtime) => runtime.openExternal(url)),
   importConfig: () => call((runtime) => runtime.importConfig()),
   exportConfig: () => call((runtime) => runtime.exportConfig()),

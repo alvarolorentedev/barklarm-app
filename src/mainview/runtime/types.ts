@@ -1,4 +1,5 @@
 import { DiagnosticSnapshot } from '../../types/Diagnostics';
+import { BrowserOption } from '../../types/Browser';
 import {
   AnalysisSnapshot,
   IntelligenceStatus,
@@ -39,6 +40,7 @@ export type AppRPCClient = {
   openMainWindow(): Promise<void>;
   hideWindow(): Promise<void>;
   setTrayPanelHeight(height: number): Promise<void>;
+  listBrowsers(): Promise<BrowserOption[]>;
   openExternal(url: string): Promise<boolean>;
   importConfig(): Promise<boolean>;
   exportConfig(): Promise<boolean>;

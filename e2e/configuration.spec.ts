@@ -33,9 +33,17 @@ test('persists general settings across a reload', async ({ page }) => {
     .poll(() => page.evaluate((key) => localStorage.getItem(key), PERSISTENCE_KEY))
     .toContain('"sslDisabled":true');
 
+  const browser = page.getByLabel('Browser');
+  await expect(browser).toHaveValue('');
+  await browser.selectOption('mock-browser');
+  await expect
+    .poll(() => page.evaluate((key) => localStorage.getItem(key), PERSISTENCE_KEY))
+    .toContain('"browser":"mock-browser"');
+
   await page.reload();
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('switch', { name: 'Disable SSL verification' })).toBeChecked();
+  await expect(page.getByLabel('Browser')).toHaveValue('mock-browser');
 });
 
 test('adds an observer by dropping a workflow link', async ({ page }) => {
