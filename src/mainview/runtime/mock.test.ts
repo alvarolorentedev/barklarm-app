@@ -342,9 +342,10 @@ describe('mock runtime', () => {
     expect(providerStatus.destination).toBe('https://inference.example.test/v1');
   });
 
-  it('only opens HTTP(S) links', async () => {
+  it('lists a deterministic browser and only opens HTTP(S) links', async () => {
     const client = createMockClient({ scenarioName: 'healthy', storage: new MemoryStorage(), reset: true });
 
+    expect(await client.listBrowsers()).toEqual([{ id: 'mock-browser', name: 'Mock Browser' }]);
     expect(await client.openExternal('https://github.com/acme/api/actions/runs/1')).toBe(true);
     expect(await client.openExternal('javascript:alert(1)')).toBe(false);
   });

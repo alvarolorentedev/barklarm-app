@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import {
@@ -13,6 +12,7 @@ import { writeText as writeNativeClipboard } from '@tauri-apps/plugin-clipboard-
 import {
   BarklarmConfig,
   DEFAULT_CONFIG,
+  normalizeBrowser,
   normalizeConfig,
   normalizeIntelligenceMode,
   normalizeIntelligenceProvider,
@@ -42,8 +42,10 @@ import {
   ProviderTestResult,
 } from '../../types/Intelligence';
 import { State } from '../../types/State';
-import type { AppRPCClient, WindowMode } from '../runtime/types';
+import type { BrowserOption } from '../../types/Browser';
+import type { AppRPCClient } from '../runtime/types';
 import { openExternal as openExternalUrl, openIssue, setupAppMenu, TrayPresenter } from './tray';
+import { setupTrayBridge } from './tray-bridge';
 
 const noopPresenter: ObserverPresenter = {
   updateImage: () => undefined,
@@ -181,6 +183,7 @@ async function applyConfig(): Promise<void> {
   await applyAnalysisConfig();
   manager.setRefreshInterval(normalizeRefreshInterval(config.refreshInterval));
   tray?.setEndpoint(config.issueGlobalEndpoint || '');
+  tray?.setBrowser(normalizeBrowser(config.browser));
   await manager.refreshObservers(config.observables || []);
   await applyAutostart();
 }
@@ -387,6 +390,7 @@ async function initialize(): Promise<void> {
       // Never leave a release build with no tray and no visible surface.
       await invoke('show_window').catch((error) => console.error('Failed to show the main window:', error));
     }
+    tray?.setBrowser(normalizeBrowser(config.browser));
     await setupAppMenu().catch((error) => console.error('Failed to set app menu:', error));
 
     const next = analysisConfig();
@@ -412,8 +416,6 @@ async function initialize(): Promise<void> {
     manager.start(normalizeRefreshInterval(config.refreshInterval));
     await manager.refreshObservers(config.observables || []);
     await applyAutostart();
-
-    if (import.meta.env.DEV) await invoke('show_window');
   })();
   return readyPromise;
 }
@@ -459,7 +461,7 @@ async function exportConfig(): Promise<boolean> {
 export async function createDesktopClient(): Promise<AppRPCClient> {
   await initialize();
 
-  return {
+  const api: AppRPCClient = {
     async getStore(key: string): Promise<any> {
       await ready();
       return (config as any)[key];
@@ -471,12 +473,14 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       else if (key === 'intelligenceMode') config = { ...config, intelligenceMode: normalizeIntelligenceMode(value) };
       else if (key === 'intelligenceProvider')
         config = { ...config, intelligenceProvider: normalizeIntelligenceProvider(value) };
+      else if (key === 'browser') config = { ...config, browser: normalizeBrowser(value) };
       else config = { ...config, [key]: value } as BarklarmConfig;
       await saveConfig();
 
       if (key === 'observables') await manager?.refreshObservers(config.observables || []);
       if (key === 'refreshInterval') manager?.setRefreshInterval(normalizeRefreshInterval(value));
       if (key === 'issueGlobalEndpoint') tray?.setEndpoint(String(value || ''));
+      if (key === 'browser') tray?.setBrowser(normalizeBrowser(value));
       if (key === 'autostart') await applyAutostart();
       if (key === 'diagnosticsEnabled') {
         evidence?.setEnabled(Boolean(value));
@@ -587,16 +591,9 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       return true;
     },
 
-    async getWindowMode(): Promise<WindowMode> {
-      return invoke<WindowMode>('get_window_mode');
-    },
-
-    async onWindowModeChange(handler: (mode: WindowMode) => void): Promise<() => void> {
-      return listen<WindowMode>('barklarm-window-mode', (event) => handler(event.payload));
-    },
-
-    async openMainWindow(): Promise<void> {
+    async openMainWindow(route?: string): Promise<void> {
       await ready();
+      if (route) window.location.hash = route;
       await invoke('open_main_window');
     },
 
@@ -610,11 +607,20 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       await invoke('resize_tray_panel', { height });
     },
 
+    async listBrowsers(): Promise<BrowserOption[]> {
+      await ready();
+      try {
+        return await invoke<BrowserOption[]>('list_browsers');
+      } catch (error) {
+        console.error('Failed to list browsers:', error);
+        return [];
+      }
+    },
+
     async openExternal(url: string): Promise<boolean> {
       await ready();
       if (!isHttpUrl(url)) return false;
-      openExternalUrl(url);
-      return true;
+      return openExternalUrl(url, normalizeBrowser(config.browser));
     },
 
     importConfig,
@@ -634,4 +640,7 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       void invoke('log_frontend', { message }).catch(() => undefined);
     },
   };
+
+  await setupTrayBridge(api);
+  return api;
 }

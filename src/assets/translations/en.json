@@ -54,6 +54,8 @@
   "Monitoring": "Monitoring",
   "Refresh interval": "Refresh interval",
   "Issue endpoint": "Issue endpoint",
+  "Browser": "Browser",
+  "System default": "System default",
   "Startup": "Startup",
   "Start at login": "Start at login",
   "Disable SSL verification": "Disable SSL verification",

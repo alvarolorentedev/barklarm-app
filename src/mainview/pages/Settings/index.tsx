@@ -6,11 +6,14 @@ import Switch from '../../components/fields/Switch';
 import { translate } from '../../i18n';
 import { storage } from './helpers/storage';
 import { IntelligenceSettings } from './Intelligence';
+import type { BrowserOption } from '../../../types/Browser';
 
 export const Settings = () => {
   const [sslDisabled, setSslDisabled] = useState(false);
   const [refreshInterval, setRefreshInterval] = useState(60000);
   const [issueGlobalEndpoint, setIssueGlobalEndpoint] = useState('');
+  const [browser, setBrowser] = useState('');
+  const [browsers, setBrowsers] = useState<BrowserOption[]>([]);
   const [autostart, setAutostart] = useState(true);
   const [diagnosticsEnabled, setDiagnosticsEnabled] = useState(false);
   const dirty = useRef(false);
@@ -21,6 +24,9 @@ export const Settings = () => {
     saveRefreshInterval,
     getissueGlobalEndpoint,
     saveissueGlobalEndpoint,
+    getBrowser,
+    saveBrowser,
+    listBrowsers,
     getAutostart,
     saveAutostart,
     getDiagnosticsEnabled,
@@ -41,13 +47,17 @@ export const Settings = () => {
       getSslDisabled(),
       getRefreshInterval(),
       getissueGlobalEndpoint(),
+      getBrowser(),
+      listBrowsers(),
       getAutostart(),
       getDiagnosticsEnabled(),
-    ]).then(([ssl, interval, endpoint, startAtLogin, diagnostics]) => {
+    ]).then(([ssl, interval, endpoint, selectedBrowser, availableBrowsers, startAtLogin, diagnostics]) => {
       if (dirty.current) return;
       setSslDisabled(ssl);
       setRefreshInterval(interval);
       setIssueGlobalEndpoint(endpoint);
+      setBrowser(selectedBrowser);
+      setBrowsers(availableBrowsers);
       setAutostart(startAtLogin);
       setDiagnosticsEnabled(diagnostics);
     });
@@ -98,6 +108,31 @@ export const Settings = () => {
             placeholder="https://..."
             aria-label={translate('Issue endpoint')}
           />
+        </SettingsRow>
+        <SettingsRow
+          label={translate('Browser')}
+          description="App used for project links. Keep the system default to use your default browser."
+        >
+          <select
+            className="input input-wide"
+            value={browser}
+            onChange={(event) => {
+              dirty.current = true;
+              saveBrowser(event.target.value);
+              setBrowser(event.target.value);
+            }}
+            aria-label={translate('Browser')}
+          >
+            <option value="">{translate('System default')}</option>
+            {browsers.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+            {browser && !browsers.some((option) => option.id === browser) ? (
+              <option value={browser}>{browser}</option>
+            ) : null}
+          </select>
         </SettingsRow>
       </SettingsGroup>
 

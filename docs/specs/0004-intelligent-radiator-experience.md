@@ -19,11 +19,12 @@ Phase 3 makes the tray the first surface and the full window the detailed surfac
 
 ## Goals
 
-1. One tray surface. Clicking the tray icon toggles a compact overlay; there is no separate right-click menu design.
-2. The overlay shows health counts and one row per observer. A failure opens diagnosis, next action and agent handoff
-   without opening the app.
-3. The full window exposes a Radiator page with operational summary and all observers, plus a focused failure detail
-   route with evidence.
+1. One tray surface in a dedicated `tray` window. Clicking the tray icon toggles that window; there is no separate
+   right-click menu design.
+2. The tray shows health counts and one row per observer. A failure opens diagnosis, next action and agent handoff
+   without opening the main app window.
+3. The separate `main` window exposes a Radiator page with operational summary and all observers, plus a focused failure
+   detail route with evidence.
 4. Observed status, diagnostic evidence, AI interpretation, recommendations and uncertainty remain visually distinct.
 5. A deterministic, sanitized, size-bounded agent prompt can be previewed and copied from the overlay and the app.
 6. Diagnostics and built-in intelligence can be activated contextually without a wizard or restart.
@@ -41,13 +42,13 @@ public README/website/marketing overhaul (Phase 5). No changes to the issue webh
 ### Surfaces
 
 1. **Tray icon:** operational status only; AI never changes its colour or icon.
-2. **Tray overlay:** a single 380 px wide popover-style panel with native macOS material, rounded corners and no
-   titlebar or close button. It is content-sized between 200 and 520 px, toggles from the tray icon, and hides on focus
-   loss or Escape.
-3. **Overlay modes:** overview, failure detail, prompt preview, healthy and empty. Footer rows expose the primary
-   action, Settings and Quit; failure detail also exposes Open source, Open issue when configured and Copy agent prompt.
-   If the full window is already visible, a tray click focuses it instead of replacing it with the overlay; the overlay
-   is not a second simultaneous view.
+2. **Tray window:** a separate 380 px wide borderless window with the original Barklarm tray visuals: header,
+   compact counts, observer rows and the blue primary footer action. It is content-sized between 200 and 520 px,
+   toggles from the tray icon, and hides on focus loss, Escape or its close button.
+3. **Tray modes:** overview, failure detail, prompt preview, healthy and empty. The footer exposes the primary action
+   and Quit; the header exposes Settings and Close. Failure detail also exposes Open source, Open issue when
+   configured and Copy agent prompt. A tray click always opens the tray window, even when the main window is visible.
+   The main window is only opened explicitly from a tray action.
 4. **Linux fallback:** Tauri does not emit tray click events on Linux. A minimal native menu (`Open Barklarm`, `Quit`)
    is the platform fallback. The overlay is documented as unavailable there.
 5. **Full window:** `/radiator` default, `/radiator/observer/:id` detail, `/observers`, `/settings`, `/general`
@@ -114,26 +115,29 @@ public README/website/marketing overhaul (Phase 5). No changes to the issue webh
 ## Architecture
 
 ```text
-Tray click -> TrayWindowController -> same main window, tray mode -> /tray routes
-                                          |
-StatusProvider (existing poll) -----------+--> pure radiator projection
-                                          |       |
-                                          |       +--> overlay overview
-                                          |       +--> full Radiator
-                                          |
-                                          +--> failure detail reads evidence/analysis
-                                                   |
-EvidenceManager / AnalysisManager (unchanged) -----+
-                                                   |
-buildAgentHandoff (pure core) -> preview -> AppRPCClient.writeClipboard
+Tray icon -> toggle dedicated tray window (380 px, borderless)
+                       |
+                       +--> tray React root -> TrayProxyClient --local RPC--> main React root
+                                                                          |
+                                                                          +--> ObserverManager
+                                                                          +--> EvidenceManager
+                                                                          +--> AnalysisManager
+                                                                          |
+                                                                          +--> AppShell / Radiator / detail
+
+Tray action "Open Barklarm" -> main window route + show main + hide tray
 ```
 
 - Presentation is a read-only projection. It is not a second source of truth.
-- The overview reads only `State`. Failure detail fetches evidence/analysis for its selected failure; there is no
-  per-card polling. Reads never trigger collection or inference. Explicit retry buttons remain user actions.
-- The overlay is the existing window in a different mode, so there is exactly one renderer and one runtime. A second
-  window would duplicate polling, evidence collection and inference unless orchestration moved out of the renderer.
-- Native window mode changes live behind `AppRPCClient`; React never imports Tauri.
+- The `main` window owns polling, evidence, analysis, notifications and the tray icon. Closing it hides it; it is never
+  destroyed during normal use.
+- The `tray` window never creates managers. Its `AppRPCClient` implementation sends allowlisted requests over Tauri
+  events to the main window and awaits correlated responses. Window-local actions call Rust directly.
+- Both windows render shared React components. They do not share a webview, JS context, observer manager or analysis
+  manager.
+- The overview reads only `State`. Failure detail fetches evidence/analysis for its selected failure; reads never
+  trigger collection or inference. Explicit retry buttons remain user actions.
+- Native window management lives behind `AppRPCClient` and Rust commands; React never imports Tauri.
 - No new state-management dependency.
 
 ## Data and evidence
@@ -151,7 +155,10 @@ sanitization and analysis invalidation remain owned by the existing managers. No
 - Clipboard is write-only and user-initiated. The desktop runtime uses the native
   `clipboard-manager:allow-write-text` capability behind `AppRPCClient`, with a selectable preview fallback. There is
   no clipboard-read permission.
-- The tray window has no new network or file capability; it uses existing window commands only.
+- The tray window has no new network or file capability; it uses existing window commands and a local, method-allowlisted
+  RPC bridge to the main window.
+- Tray RPC requests carry a correlation id, are rejected after a timeout, and cannot call window-local main methods.
+  External links opened from the tray are executed by the main client so the configured browser policy still applies.
 - CSP is unchanged.
 
 ## Testing
@@ -167,29 +174,31 @@ sanitization and analysis invalidation remain owned by the existing managers. No
 
 ## Rollout and rollback
 
-Routes are additive; `/general` redirects. Configuration is unchanged. Tray mode is default on macOS/Windows; the full
-app remains reachable. Rollback is reverting the change; no migration is involved.
+Routes are additive; `/general` redirects. The tray window is default on macOS/Windows; the full app remains
+reachable. Rollback is reverting the change; no migration is involved.
 
 ## Implementation record
 
-- Browser acceptance: 36 Playwright tests pass, including the original configuration/diagnostics/intelligence journeys
-  and the new Radiator, tray, citation, handoff, activation, recovery and resolution journeys.
-- Unit/component: 564 tests pass. Coverage is 87.48% lines/statements, 86.05% branches and 80.59% functions overall;
-  `src/core/**` is 95.42% lines/statements, 89.44% branches and 94.87% functions.
+- Browser acceptance: 37 Playwright tests pass, including the original configuration/diagnostics/intelligence journeys
+  and the Radiator, tray, citation, handoff, activation, recovery and resolution journeys.
+- Unit/component: 583 tests pass. Coverage is 86.90% lines/statements, 86.28% branches and 81.79% functions overall;
+  `src/core/**` is 95.47% lines/statements, 89.50% branches and 95.00% functions.
 - `bun run check`, `bun run audit`, `bun run test:evals:mock`, `rust:fmt`, `rust:clippy`, `rust:test`,
   `sidecar:smoke` and the release bundle build pass on macOS arm64.
 - Visual review used synthetic mock data at 380×520 (overlay), 860×600, 720×520 and light/dark. Assets are in
   [../media/phase3/](../media/phase3/), with a synthetic handoff example in
   [handoff-example.txt](../media/phase3/handoff-example.txt).
-- Native interactive limitation: the release app builds, launches, stays resident and has no on-screen app window at
-  launch, but this agent environment has no screen capture and tray-click automation could not locate the status item.
-  The overlay click, native clipboard write, focus/blur and full-app transition are therefore unverified natively and
-  are carried into Phase 4. Browser mocks are not evidence of native window or clipboard behaviour.
+- Native interactive qualification remains partial: macOS window placement, hidden startup, tray toggle, tray detail
+  and tray-to-main navigation were verified through accessibility/window inspection. Native clipboard, focus/blur and
+  other platforms still require release smoke tests. Browser mocks are not evidence of native window or clipboard
+  behaviour.
 - Linux keeps the native tray menu fallback because Tauri cannot emit tray click events there. macOS/Windows use the
-  single overlay surface.
-- The overlay uses a transparent window, native macOS `Popover` material, Windows Acrylic and a CSS fallback on Linux.
-  Rounded corners and the hairline border are CSS; the window mode is guarded so the tray shell cannot render in a
-  decorated main window.
+  dedicated tray window.
+- Two-window revision: the `tray` window is a separate borderless webview with the original Barklarm header, counts,
+  observer rows and blue footer action. The `main` window stays decorated and owns all managers. A local, allowlisted
+  RPC bridge supplies tray state and snapshots without duplicating polling, evidence collection or inference.
+- Native verification on macOS confirmed hidden startup, one tray status item, a 380 px tray window, tray detail
+  loading through the bridge, and `Open Barklarm` showing the separate 860×600 main window while hiding the tray.
 - Independent review resolutions: tray icons are decoded through the image pipeline instead of `fetch` under the
   production CSP, with a visible-window fallback if tray creation fails; handoff delimiters and source-derived metadata
   are contained in the untrusted block; focus-loss hiding is deferred briefly to avoid the Windows tray-toggle race;

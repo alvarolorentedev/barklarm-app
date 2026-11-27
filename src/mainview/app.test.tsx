@@ -38,11 +38,10 @@ vi.mock('./rpc-client', () => ({
     testInferenceProvider: vi.fn(),
     writeClipboard: vi.fn(),
     openIssue: vi.fn(),
-    getWindowMode: vi.fn(),
-    onWindowModeChange: vi.fn(),
     openMainWindow: vi.fn(),
     hideWindow: vi.fn(),
     setTrayPanelHeight: vi.fn(),
+    listBrowsers: vi.fn().mockResolvedValue([]),
     openExternal: vi.fn(),
     importConfig: vi.fn(),
     exportConfig: vi.fn(),
@@ -106,12 +105,14 @@ const analysis: DiagnosticAnalysis = {
 
 const configs = [{ id: 'o1', type: 'githubAction', alias: 'CloudLink · CI' }];
 
-const renderApp = (path: string) =>
-  render(
+const renderApp = (path: string, tray = path.startsWith('/tray')) => {
+  window.history.replaceState(null, '', tray ? '/?window=tray' : '/');
+  return render(
     <MemoryRouter initialEntries={[path]}>
       <App />
     </MemoryRouter>
   );
+};
 
 describe('App', () => {
   beforeEach(() => {
@@ -127,8 +128,6 @@ describe('App', () => {
     mockClient.writeClipboard.mockResolvedValue(true);
     mockClient.openExternal.mockResolvedValue(true);
     mockClient.openIssue.mockResolvedValue(true);
-    mockClient.getWindowMode.mockResolvedValue('tray');
-    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);
@@ -193,20 +192,22 @@ describe('App', () => {
     renderApp('/tray');
     await screen.findByRole('button', { name: /CloudLink · CI/ });
 
-    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: /^Settings/ }));
-    await waitFor(() => expect(mockClient.openMainWindow).toHaveBeenCalled());
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(mockClient.hideWindow).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    await waitFor(() => expect(mockClient.openMainWindow).toHaveBeenCalledWith('/settings'));
   });
 
-  it('keeps the tray shell out of a main-mode window', async () => {
-    mockClient.getWindowMode.mockResolvedValue('main');
-    renderApp('/tray');
+  it('keeps tray routes out of the main window', async () => {
+    const view = renderApp('/tray', false);
+    expect(window.location.search).toBe('');
 
-    expect(await screen.findByRole('heading', { name: 'Radiator' })).toBeInTheDocument();
+    expect(view.container.querySelector('h1')).toHaveTextContent('Radiator');
     expect(screen.queryByText('Open Barklarm')).not.toBeInTheDocument();
   });
 
@@ -248,8 +249,6 @@ describe('tray and detail edge states', () => {
     mockClient.getObserverStates.mockResolvedValue([failureState]);
     mockClient.getDiagnosticEvidence.mockResolvedValue({ status: 'available', evidence });
     mockClient.getAnalysis.mockResolvedValue({ status: 'available', analysis });
-    mockClient.getWindowMode.mockResolvedValue('tray');
-    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);
@@ -287,8 +286,6 @@ describe('presentation edge states', () => {
     mockClient.getStore.mockImplementation((key: string) =>
       Promise.resolve(key === 'observables' ? configs : undefined)
     );
-    mockClient.getWindowMode.mockResolvedValue('tray');
-    mockClient.onWindowModeChange.mockResolvedValue((): void => undefined);
     mockClient.openMainWindow.mockResolvedValue(undefined);
     mockClient.hideWindow.mockResolvedValue(undefined);
     mockClient.setTrayPanelHeight.mockResolvedValue(undefined);

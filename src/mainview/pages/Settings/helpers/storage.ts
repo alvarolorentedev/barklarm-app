@@ -1,4 +1,5 @@
 import { client } from '../../../rpc-client';
+import type { BrowserOption } from '../../../../types/Browser';
 
 export const storage = () => ({
   getSslDisabled: async (): Promise<boolean> => {
@@ -18,6 +19,15 @@ export const storage = () => ({
   },
   saveissueGlobalEndpoint: async (issueGlobalEndpoint?: string): Promise<void> => {
     await client.setStore('issueGlobalEndpoint', issueGlobalEndpoint);
+  },
+  getBrowser: async (): Promise<string> => {
+    return (await client.getStore('browser')) ?? '';
+  },
+  saveBrowser: async (browser: string): Promise<void> => {
+    await client.setStore('browser', browser);
+  },
+  listBrowsers: async (): Promise<BrowserOption[]> => {
+    return client.listBrowsers();
   },
   getAutostart: async (): Promise<boolean> => {
     return (await client.getStore('autostart')) ?? true;

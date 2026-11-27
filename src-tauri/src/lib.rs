@@ -1,18 +1,13 @@
+mod browser;
 mod intelligence;
 mod store;
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::Duration;
-#[cfg(target_os = "windows")]
-use tauri::utils::WindowEffect;
-use tauri::utils::config::WindowEffectsConfig;
-#[cfg(target_os = "macos")]
-use tauri::utils::{WindowEffect, WindowEffectState};
-use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WindowEvent};
+use tauri::{Manager, PhysicalPosition, PhysicalSize, WindowEvent};
 
 static MENU_IMAGES_OK: AtomicBool = AtomicBool::new(false);
-static TRAY_MODE: AtomicBool = AtomicBool::new(false);
 static FOCUS_EPOCH: AtomicU64 = AtomicU64::new(0);
 static TRAY_ANCHOR: Mutex<Option<TrayAnchor>> = Mutex::new(None);
 static TRAY_HEIGHT: Mutex<f64> = Mutex::new(TRAY_PANEL_MAX_HEIGHT);
@@ -70,46 +65,10 @@ fn apply_tray_position(
     Ok(())
 }
 
-fn apply_tray_window_effects(_window: &tauri::WebviewWindow) {
-    #[cfg(target_os = "macos")]
-    {
-        let effects = WindowEffectsConfig {
-            effects: vec![WindowEffect::Popover],
-            state: Some(WindowEffectState::Active),
-            ..Default::default()
-        };
-        let _ = _window.set_effects(Some(effects));
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let effects = WindowEffectsConfig {
-            effects: vec![WindowEffect::Acrylic],
-            ..Default::default()
-        };
-        let _ = _window.set_effects(Some(effects));
-    }
-}
-
 fn restore_main_window(window: &tauri::WebviewWindow) -> tauri::Result<()> {
-    TRAY_MODE.store(false, Ordering::Relaxed);
-    let _ = window.set_effects(None::<WindowEffectsConfig>);
     let _ = window.unminimize();
-    window.set_decorations(true)?;
-    window.set_always_on_top(false)?;
-    window.set_resizable(true)?;
-    window.set_skip_taskbar(false)?;
-    let scale = window
-        .primary_monitor()?
-        .map(|monitor| monitor.scale_factor())
-        .unwrap_or(1.0);
-    window.set_size(PhysicalSize::new(
-        (860.0 * scale) as u32,
-        (600.0 * scale) as u32,
-    ))?;
-    window.center()?;
     window.show()?;
     window.set_focus()?;
-    let _ = window.emit("barklarm-window-mode", "main");
     Ok(())
 }
 
@@ -189,6 +148,9 @@ fn log_frontend(message: String) {
 
 #[tauri::command]
 fn show_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("tray") {
+        window.hide().map_err(|error| error.to_string())?;
+    }
     if let Some(window) = app.get_webview_window("main") {
         restore_main_window(&window).map_err(|error| error.to_string())?;
     }
@@ -202,25 +164,10 @@ fn open_main_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn hide_window(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_webview_window("tray") {
         window.hide().map_err(|error| error.to_string())?;
     }
     Ok(())
-}
-
-#[tauri::command]
-fn get_window_mode(app: tauri::AppHandle) -> Result<String, String> {
-    let Some(window) = app.get_webview_window("main") else {
-        return Ok("hidden".into());
-    };
-    let visible = window.is_visible().map_err(|error| error.to_string())?;
-    if !visible {
-        Ok("hidden".into())
-    } else if TRAY_MODE.load(Ordering::Relaxed) {
-        Ok("tray".into())
-    } else {
-        Ok("main".into())
-    }
 }
 
 #[tauri::command]
@@ -232,14 +179,17 @@ fn show_tray_panel(
     height: u32,
 ) -> Result<(), String> {
     let window = app
-        .get_webview_window("main")
-        .ok_or_else(|| "main window is unavailable".to_string())?;
+        .get_webview_window("tray")
+        .ok_or_else(|| "tray window is unavailable".to_string())?;
     let monitor = app
         .monitor_from_point(
             x as f64 + width as f64 / 2.0,
             y as f64 + height as f64 / 2.0,
         )
-        .map_err(|error| error.to_string())?
+        .ok()
+        .flatten()
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| window.primary_monitor().ok().flatten())
         .ok_or_else(|| "tray monitor is unavailable".to_string())?;
     let work = monitor.work_area();
     let anchor = TrayAnchor {
@@ -254,36 +204,36 @@ fn show_tray_panel(
         scale: monitor.scale_factor(),
     };
     *TRAY_ANCHOR.lock().map_err(|error| error.to_string())? = Some(anchor);
-    TRAY_MODE.store(true, Ordering::Relaxed);
 
-    window
-        .set_decorations(false)
-        .map_err(|error| error.to_string())?;
-    window
-        .set_always_on_top(true)
-        .map_err(|error| error.to_string())?;
-    window
-        .set_resizable(false)
-        .map_err(|error| error.to_string())?;
-    window
-        .set_skip_taskbar(true)
-        .map_err(|error| error.to_string())?;
     let height = *TRAY_HEIGHT.lock().map_err(|error| error.to_string())?;
     apply_tray_position(&window, anchor, clamp_tray_height(height))
         .map_err(|error| error.to_string())?;
-    apply_tray_window_effects(&window);
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
-    let _ = window.emit("barklarm-window-mode", "tray");
     Ok(())
 }
 
 #[tauri::command]
-fn resize_tray_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
-    if !TRAY_MODE.load(Ordering::Relaxed) {
+fn toggle_tray_window(
+    app: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("tray") else {
+        return Ok(());
+    };
+    if window.is_visible().map_err(|error| error.to_string())? {
+        window.hide().map_err(|error| error.to_string())?;
         return Ok(());
     }
-    let Some(window) = app.get_webview_window("main") else {
+    show_tray_panel(app, x, y, width, height)
+}
+
+#[tauri::command]
+fn resize_tray_panel(app: tauri::AppHandle, height: f64) -> Result<(), String> {
+    let Some(window) = app.get_webview_window("tray") else {
         return Ok(());
     };
     let anchor = *TRAY_ANCHOR.lock().map_err(|error| error.to_string())?;
@@ -314,12 +264,14 @@ pub fn run() {
             store::import_config,
             store::export_config,
             store::quit_app,
+            browser::list_browsers,
+            browser::open_with_browser,
             log_frontend,
             show_window,
             open_main_window,
             hide_window,
-            get_window_mode,
             show_tray_panel,
+            toggle_tray_window,
             resize_tray_panel,
             menu_images_supported,
             intelligence::intelligence_status,
@@ -348,12 +300,16 @@ pub fn run() {
             }
 
             if let Some(window) = app.get_webview_window("main") {
-                #[cfg(debug_assertions)]
-                {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                let window_for_close = window.clone();
+                window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = window_for_close.hide();
+                    }
+                });
+            }
 
+            if let Some(window) = app.get_webview_window("tray") {
                 let window_for_close = window.clone();
                 window.on_window_event(move |event| match event {
                     WindowEvent::CloseRequested { api, .. } => {
@@ -363,17 +319,13 @@ pub fn run() {
                     WindowEvent::Focused(true) => {
                         FOCUS_EPOCH.fetch_add(1, Ordering::Relaxed);
                     }
-                    WindowEvent::Focused(false) if TRAY_MODE.load(Ordering::Relaxed) => {
+                    WindowEvent::Focused(false) => {
                         // Menu-bar clicks can move focus before the JS tray handler runs.
-                        // Defer the hide so the handler can toggle the panel instead of
-                        // observing a hidden window and reopening it.
                         let epoch = FOCUS_EPOCH.fetch_add(1, Ordering::Relaxed) + 1;
                         let window = window_for_close.clone();
                         std::thread::spawn(move || {
                             std::thread::sleep(Duration::from_millis(250));
-                            if FOCUS_EPOCH.load(Ordering::Relaxed) == epoch
-                                && TRAY_MODE.load(Ordering::Relaxed)
-                            {
+                            if FOCUS_EPOCH.load(Ordering::Relaxed) == epoch {
                                 let _ = window.hide();
                             }
                         });

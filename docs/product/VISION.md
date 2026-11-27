@@ -15,13 +15,14 @@ coding-agent handoff.
 
 ## Phase 3: the radiator experience
 
-Barklarm 4.0 puts the radiator first. Clicking the menu-bar icon opens a compact overlay with operational counts and
-one row per observer; a failure opens a focused detail with the likely cause, the next useful action and a deterministic
-coding-agent handoff. The full window remains the detailed surface for evidence, citations, observers and settings.
+Barklarm 4.0 puts the radiator first. Clicking the menu-bar icon opens a dedicated, compact tray window with operational
+counts and one row per observer; a failure opens a focused detail with the likely cause, the next useful action and a
+deterministic coding-agent handoff. The separate main window remains the detailed surface for evidence, citations,
+observers and settings.
 
-The overlay is one tray surface, not a left-click view plus a separate right-click menu design. Linux keeps a native
-menu fallback because Tauri cannot emit tray click events there. AI never changes operational status, colours or the
-tray icon.
+The tray window is one tray surface, not a left-click view plus a separate right-click menu design. Linux keeps a
+native menu fallback because Tauri cannot emit tray click events there. AI never changes operational status, colours
+or the tray icon.
 
 ## Direction
 

@@ -16,7 +16,7 @@ test('keeps the radiator and settings usable in Spanish', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Ajustes' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Monitorización' })).toBeVisible();
 
-  await page.goto('/?scenario=empty&reset=1#/tray');
+  await page.goto('/?window=tray&scenario=empty&reset=1#/tray');
   await expect(page.getByText('Aún no hay observadores')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Añadir observador' })).toBeVisible();
 });

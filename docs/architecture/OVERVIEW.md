@@ -77,20 +77,21 @@ New integrations follow that shape; they do not add switches to core.
 
 - The default full-window route is `/radiator`; `/radiator/observer/:id` is the failure detail, `/observers` and
   `/settings` remain. `/general` redirects to `/settings`.
-- Clicking the tray icon toggles one compact overlay (`/tray`, `/tray/observer/:id`, `/tray/handoff/:id`). It is the
-  same hidden main window in tray mode, resized to 380 px and content-sized between 200 and 520 px. Tray mode applies
-  native window material, rounded corners and no window chrome; restoring main mode clears the effect. This avoids a
-  second renderer and duplicate polling, evidence collection or inference. A window-mode guard keeps `/tray` routes out
-  of the decorated main window.
-- The overlay and full Radiator overview read only `State`; failure detail loads its own evidence/analysis snapshots,
+- Clicking the tray icon toggles a dedicated `tray` window (`/tray`, `/tray/observer/:id`, `/tray/handoff/:id`). It is
+  a separate 380 px borderless webview, content-sized between 200 and 520 px, with the original Barklarm tray visuals.
+  The `main` window stays decorated and never becomes the tray.
+- The `main` window owns polling, evidence, analysis, notifications and the tray icon. The tray window uses an
+  allowlisted local RPC bridge to read that state and invoke actions; it never creates a second manager or runtime.
+  Closing either window hides it.
+- The tray and full Radiator overview read only `State`; failure detail loads its own evidence/analysis snapshots,
   discards stale results by observer/failure identity and polls only transient states. Reads never schedule collection
   or analysis.
 - `src/core/presentation/radiator.ts` derives counts, deterministic ordering and health state from existing contracts.
 - `src/core/handoff.ts` composes a deterministic, sanitized, bounded prompt. Trusted instructions and untrusted
   evidence are separated; stale analysis is never included. The desktop runtime exposes clipboard writes behind
   `AppRPCClient`; React never imports Tauri.
-- The overlay has Settings/Quit/Open issue/Open source actions, so there is no second native menu view on macOS or
-  Windows. Linux keeps a minimal native-menu fallback because Tauri does not emit tray click events there.
+- The tray window has Settings/Quit/Open issue/Open source actions, so there is no second native menu view on macOS
+  or Windows. Linux keeps a minimal native-menu fallback because Tauri does not emit tray click events there.
 - The tray icon and operational colours remain derived from `State` only; analysis never changes them.
 
 ## State contract

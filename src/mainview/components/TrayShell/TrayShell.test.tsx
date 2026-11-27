@@ -4,7 +4,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { MemoryRouter } from 'react-router-dom';
+import { HashRouter, MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { client } from '../../rpc-client';
 import { TrayShell } from './index';
@@ -52,10 +52,10 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(320));
+    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(386));
   });
 
-  it('hides the overlay on Escape without a custom close button', async () => {
+  it('hides the overlay on Escape and the close button', async () => {
     render(
       <MemoryRouter initialEntries={['/tray']}>
         <TrayShell>
@@ -66,8 +66,29 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(mockClient.hideWindow).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not restore the main window on a StrictMode remount', async () => {
+    window.location.hash = '#/tray';
+    render(
+      <React.StrictMode>
+        <HashRouter>
+          <TrayShell>
+            <div className="tray-page">
+              <div className="tray-content" />
+            </div>
+          </TrayShell>
+        </HashRouter>
+      </React.StrictMode>
+    );
+
+    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalled());
+    expect(mockClient.openMainWindow).not.toHaveBeenCalled();
+    window.history.replaceState(null, '', window.location.pathname);
   });
 });
