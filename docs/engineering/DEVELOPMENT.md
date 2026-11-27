@@ -236,7 +236,7 @@ These are tracked, not silently ignored:
 - The native build warns that the bundle identifier ends in `.app`; changing it would break update
   identity and needs a migration decision.
 - `.codeclimate.yml` still references an old renderer path and ESLint 6 and is not used by CI.
-- macOS/Windows release builds are unsigned and not notarized.
+- macOS release builds are signed and notarized in CI; Windows release builds remain unsigned and not notarized.
 
 ## Troubleshooting
 

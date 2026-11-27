@@ -1,7 +1,7 @@
 {
   "name": "barklarm",
   "productName": "Barklarm",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "description": "Build & Observability Radiator",
   "repository": "https://github.com/alvarolorentedev/barklarm-app",
   "contributors": [

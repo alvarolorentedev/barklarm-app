@@ -37,8 +37,8 @@ Workflow permissions are least-privilege: repository contents are read-only exce
 ## Artifacts
 
 Builds upload from `src-tauri/target/release/bundle/**/*` and publish `.dmg`, `.deb`, `.rpm`, `.AppImage`, `.msi` and
-`.exe` files. Builds are currently unsigned/not notarized; changing that requires human-owned Apple/Microsoft
-credentials and secrets.
+`.exe` files. macOS builds are signed with Developer ID and notarized in CI; the bundled llama libraries are signed
+before Tauri signs and notarizes the app bundle. Linux and Windows builds remain unsigned.
 
 ## Local native smoke test
 

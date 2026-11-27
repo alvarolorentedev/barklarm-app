@@ -66,7 +66,31 @@ jobs:
       - run: bun install --frozen-lockfile
       - run: bun run sidecar:fetch -- --target=${{ matrix.target }}
       - run: bun run sidecar:smoke -- --target=${{ matrix.target }}
-      - run: bun run build -- --verbose
+      - name: Sign macOS release binaries
+        if: runner.os == 'macOS'
+        uses: ./.github/actions/macos-sign
+        with:
+          certificate: ${{ secrets.MACOS_CERTIFICATE_APP }}
+          certificate-password: ${{ secrets.MACOS_CERTIFICATE_APP_PWD }}
+          keychain-password: ${{ secrets.MACOS_KEYCHAIN_PWD }}
+      - name: Build signed and notarized macOS bundle
+        if: runner.os == 'macOS'
+        run: bun run build -- --verbose
+        env:
+          APPLE_ID: ${{ secrets.MAC_APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.MAC_APPLE_ID_PWD }}
+          APPLE_TEAM_ID: ${{ secrets.MAC_APPLE_TEAM_ID }}
+      - name: Verify signed and notarized macOS bundle
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          app="src-tauri/target/release/bundle/macos/Barklarm.app"
+          test -f "$app/Contents/_CodeSignature/CodeResources"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+      - name: Build bundle
+        if: runner.os != 'macOS'
+        run: bun run build -- --verbose
       - uses: actions/upload-artifact@v4
         with:
           name: barklarm-rc-${{ matrix.name }}

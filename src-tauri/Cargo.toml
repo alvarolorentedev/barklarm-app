@@ -1,6 +1,6 @@
 [package]
 name = "barklarm"
-version = "4.0.1"
+version = "4.0.2"
 description = "Build & Observability Radiator"
 authors = ["Alvaro Lorente"]
 license = "MIT"

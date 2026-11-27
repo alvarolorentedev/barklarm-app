@@ -1,0 +1,49 @@
+name: Sign macOS release binaries
+description: Import the Developer ID certificate and sign bundled llama libraries before Tauri bundles the app.
+
+inputs:
+  certificate:
+    description: Base64-encoded Developer ID Application certificate.
+    required: true
+  certificate-password:
+    description: Password for the PKCS#12 certificate.
+    required: true
+  keychain-password:
+    description: Password for the temporary CI keychain.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Import signing certificate
+      shell: bash
+      env:
+        MACOS_CERTIFICATE_APP: ${{ inputs.certificate }}
+        MACOS_CERTIFICATE_APP_PWD: ${{ inputs.certificate-password }}
+        MACOS_KEYCHAIN_PWD: ${{ inputs.keychain-password }}
+      run: |
+        set -euo pipefail
+        keychain="$RUNNER_TEMP/barklarm-signing.keychain-db"
+        certificate="$RUNNER_TEMP/barklarm-signing.p12"
+        printf '%s' "$MACOS_CERTIFICATE_APP" | base64 -D > "$certificate"
+        security create-keychain -p "$MACOS_KEYCHAIN_PWD" "$keychain"
+        security set-keychain-settings -lut 21600 "$keychain"
+        security unlock-keychain -p "$MACOS_KEYCHAIN_PWD" "$keychain"
+        security import "$certificate" -k "$keychain" -P "$MACOS_CERTIFICATE_APP_PWD" -T /usr/bin/codesign
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$MACOS_KEYCHAIN_PWD" "$keychain"
+        security list-keychains -d user -s "$keychain"
+        identity="$(security find-identity -v -p codesigning "$keychain" | awk -F'"' '/Developer ID Application/ {print $2; exit}')"
+        if [[ -z "$identity" ]]; then
+          echo "No Developer ID Application identity found" >&2
+          exit 1
+        fi
+        printf 'APPLE_SIGNING_IDENTITY=%s\n' "$identity" >> "$GITHUB_ENV"
+        rm -f "$certificate"
+
+    - name: Sign bundled llama libraries
+      shell: bash
+      run: |
+        set -euo pipefail
+        while IFS= read -r -d '' library; do
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" --timestamp "$library"
+        done < <(find src-tauri/binaries/llama-libs -type f -name '*.dylib' -print0)

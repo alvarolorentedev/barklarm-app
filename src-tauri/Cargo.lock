@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "barklarm"
-version = "4.0.1"
+version = "4.0.2"
 dependencies = [
  "block2",
  "futures-util",

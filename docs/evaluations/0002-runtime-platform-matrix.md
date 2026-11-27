@@ -60,9 +60,8 @@ machines should use a smaller context and are warned before enabling managed inf
 ## Known limitations
 
 - Windows and Linux runtime execution has not been validated in this environment.
-- macOS and Windows builds remain unsigned/not notarized.
-- The sidecar and its libraries are bundled as resources; code signing would need to cover every library before a signed
-  release.
+- Windows builds remain unsigned/not notarized.
+- macOS CI signs the sidecar and every bundled llama library before Tauri signs and notarizes the app bundle.
 - GPU acceleration is limited to the upstream CPU/Metal build selected for each target. No CUDA/Vulkan matrix is shipped.
 - The model download depends on Hugging Face availability; the app verifies the pinned size and checksum and does not
   execute model content.
