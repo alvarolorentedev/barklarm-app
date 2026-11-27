@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted.
+Accepted. Superseded in part by [0020 — Dedicated tray window with a main-owned state bridge](0020-dedicated-tray-window.md)
+for window ownership.
 
 ## Context
 
@@ -36,4 +37,5 @@ Presentation is a read-only projection:
 
 The overview is summary plus observer rows; top-level diagnosis and its shared snapshot coordinator were removed.
 Evidence/analysis reads and polling are scoped to the failure detail. The projection and its identity rules are
-unchanged.
+unchanged. ADR 0020 moves the tray into a dedicated window; the tray reaches this projection through the main-owned
+RPC bridge rather than a second set of managers.

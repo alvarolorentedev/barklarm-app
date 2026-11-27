@@ -19,24 +19,17 @@ import { useStatus } from '../../status-context';
 import { useObservables } from '../Radiator/use-observables';
 import { useIssueEndpoint } from '../Radiator/use-issue-endpoint';
 
-const TrayFooter = ({ primary, onPrimary, onQuit }: { primary: string; onPrimary: () => void; onQuit: () => void }) => {
-  const actions = useTrayActions();
-
-  return (
-    <footer className="tray-footer">
-      <button type="button" className="tray-action-row is-primary" onClick={onPrimary}>
-        <span>{primary}</span>
-        <ChevronRight size={11} aria-hidden="true" />
-      </button>
-      <button type="button" className="tray-action-row" onClick={() => void actions.openMain('/settings')}>
-        {translate('Settings')}…
-      </button>
-      <button type="button" className="tray-action-row" onClick={onQuit}>
-        {translate('Quit')}
-      </button>
-    </footer>
-  );
-};
+const TrayFooter = ({ primary, onPrimary, onQuit }: { primary: string; onPrimary: () => void; onQuit: () => void }) => (
+  <footer className="tray-footer">
+    <button type="button" className="button primary" onClick={onPrimary}>
+      {primary}
+    </button>
+    <span className="tray-footer-spacer" />
+    <button type="button" className="tray-footer-link" onClick={onQuit}>
+      {translate('Quit')}
+    </button>
+  </footer>
+);
 
 export const TrayRadiator = () => {
   const { states, loading } = useStatus();

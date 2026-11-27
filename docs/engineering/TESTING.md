@@ -42,10 +42,10 @@ Phase 0 baseline: 80.3% lines/statements, 88.8% branches, 81.3% functions. Phase
 branches, 85.97% functions overall; core 93.27% lines/statements, 91.91% branches, 91.3% functions. Phase 2: 86.91%
 lines/statements, 86.05% branches, 87.09% functions overall. Phase 2.1: 86.83% lines/statements, 86.06% branches, 87.12%
 functions overall. Phase 3: 87.48% lines/statements, 86.05% branches, 80.59% functions overall. Overview revision:
-87.02% lines/statements, 86.19% branches, 80.53% functions overall; `src/core/**` remains 95.42% lines/statements,
-89.44% branches and 94.87% functions. All gates pass. The new code is covered by focused projection, summary, observer
-list, drag-and-drop, tray-shell, native-mode routing, component and route tests, not exclusions. Gates in
-`vitest.config.ts`:
+87.02% lines/statements, 86.19% branches, 80.53% functions overall. Two-window revision: 86.90% lines/statements,
+86.28% branches, 81.79% functions overall; `src/core/**` is 95.47% lines/statements, 89.50% branches and 95.00%
+functions. All gates pass. The new code is covered by focused projection, summary, observer list, drag-and-drop,
+tray-shell, tray RPC bridge/client, component and route tests, not exclusions. Gates in `vitest.config.ts`:
 
 - overall: 78% lines, statements and functions; 86% branches;
 - `src/core/**`: 90% lines, statements and functions; 85% branches.

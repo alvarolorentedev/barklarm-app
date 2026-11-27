@@ -9,8 +9,6 @@ import {
 } from '../../types/Intelligence';
 import { State } from '../../types/State';
 
-export type WindowMode = 'hidden' | 'tray' | 'main';
-
 export type AppRPCClient = {
   getStore(key: string): Promise<any>;
   setStore(key: string, value: any): Promise<void>;
@@ -35,9 +33,7 @@ export type AppRPCClient = {
   testInferenceProvider(input: ProviderTestInput): Promise<ProviderTestResult>;
   writeClipboard(text: string): Promise<boolean>;
   openIssue(observerId: string): Promise<boolean>;
-  getWindowMode(): Promise<WindowMode>;
-  onWindowModeChange(handler: (mode: WindowMode) => void): Promise<() => void>;
-  openMainWindow(): Promise<void>;
+  openMainWindow(route?: string): Promise<void>;
   hideWindow(): Promise<void>;
   setTrayPanelHeight(height: number): Promise<void>;
   listBrowsers(): Promise<BrowserOption[]>;

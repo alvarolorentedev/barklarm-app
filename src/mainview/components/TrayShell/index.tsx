@@ -1,14 +1,16 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { Settings, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { translate } from '../../i18n';
 import { client } from '../../rpc-client';
 
 export function useTrayActions() {
   const navigate = useNavigate();
   return {
     openMain: async (route: string) => {
-      navigate(route, { replace: true });
+      navigate('/tray', { replace: true });
       try {
-        await client.openMainWindow();
+        await client.openMainWindow(route);
       } catch (error) {
         console.error('Could not open the main window:', error);
       }
@@ -30,8 +32,7 @@ export const TrayShell = ({ children }: { children: React.ReactNode }) => {
   const measure = useCallback(() => {
     const content = main.current?.querySelector<HTMLElement>('.tray-content');
     if (!content) return;
-    const footer = main.current?.querySelector<HTMLElement>('.tray-footer');
-    const height = Math.min(520, Math.max(200, 20 + content.scrollHeight + (footer?.offsetHeight ?? 0)));
+    const height = Math.min(520, Math.max(200, 86 + content.scrollHeight));
     void client.setTrayPanelHeight(height).catch(() => undefined);
   }, []);
 
@@ -49,14 +50,6 @@ export const TrayShell = ({ children }: { children: React.ReactNode }) => {
   }, [location.pathname]);
 
   useEffect(() => {
-    return () => {
-      // StrictMode remounts effects, so only restore when the route actually left /tray.
-      if (window.location.hash.startsWith('#/tray')) return;
-      void client.openMainWindow().catch((error) => console.error('Could not restore the main window:', error));
-    };
-  }, []);
-
-  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -69,6 +62,28 @@ export const TrayShell = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <div className="tray-shell">
+      <header className="tray-head">
+        <span className="tray-brand">Barklarm</span>
+        <span className="tray-head-spacer" />
+        <button
+          type="button"
+          className="tray-icon-button"
+          aria-label={translate('Settings')}
+          title={translate('Settings')}
+          onClick={() => void actions.openMain('/settings')}
+        >
+          <Settings size={13} aria-hidden="true" />
+        </button>
+        <button
+          type="button"
+          className="tray-icon-button"
+          aria-label={translate('Close')}
+          title={translate('Close')}
+          onClick={actions.hide}
+        >
+          <X size={13} aria-hidden="true" />
+        </button>
+      </header>
       <main className="tray-main" tabIndex={-1} ref={main}>
         {children}
       </main>

@@ -52,10 +52,10 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
-    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(320));
+    await waitFor(() => expect(mockClient.setTrayPanelHeight).toHaveBeenCalledWith(386));
   });
 
-  it('hides the overlay on Escape without a custom close button', async () => {
+  it('hides the overlay on Escape and the close button', async () => {
     render(
       <MemoryRouter initialEntries={['/tray']}>
         <TrayShell>
@@ -66,9 +66,11 @@ describe('TrayShell', () => {
       </MemoryRouter>
     );
 
-    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(mockClient.hideWindow).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(mockClient.hideWindow).toHaveBeenCalledTimes(2);
   });
 
   it('does not restore the main window on a StrictMode remount', async () => {

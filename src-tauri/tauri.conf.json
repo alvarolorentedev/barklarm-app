@@ -21,10 +21,26 @@
         "fullscreen": false,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "transparent": true,
         "backgroundThrottling": "disabled",
         "dragDropEnabled": false,
         "devtools": false
+      },
+      {
+        "label": "tray",
+        "title": "Barklarm",
+        "url": "index.html?window=tray",
+        "width": 380,
+        "height": 520,
+        "visible": false,
+        "resizable": false,
+        "fullscreen": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "transparent": false,
+        "shadow": true,
+        "backgroundThrottling": "disabled",
+        "dragDropEnabled": false
       }
     ],
     "security": {

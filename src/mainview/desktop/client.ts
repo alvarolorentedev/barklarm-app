@@ -1,5 +1,4 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import {
@@ -44,8 +43,9 @@ import {
 } from '../../types/Intelligence';
 import { State } from '../../types/State';
 import type { BrowserOption } from '../../types/Browser';
-import type { AppRPCClient, WindowMode } from '../runtime/types';
+import type { AppRPCClient } from '../runtime/types';
 import { openExternal as openExternalUrl, openIssue, setupAppMenu, TrayPresenter } from './tray';
+import { setupTrayBridge } from './tray-bridge';
 
 const noopPresenter: ObserverPresenter = {
   updateImage: () => undefined,
@@ -461,7 +461,7 @@ async function exportConfig(): Promise<boolean> {
 export async function createDesktopClient(): Promise<AppRPCClient> {
   await initialize();
 
-  return {
+  const api: AppRPCClient = {
     async getStore(key: string): Promise<any> {
       await ready();
       return (config as any)[key];
@@ -591,16 +591,9 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       return true;
     },
 
-    async getWindowMode(): Promise<WindowMode> {
-      return invoke<WindowMode>('get_window_mode');
-    },
-
-    async onWindowModeChange(handler: (mode: WindowMode) => void): Promise<() => void> {
-      return listen<WindowMode>('barklarm-window-mode', (event) => handler(event.payload));
-    },
-
-    async openMainWindow(): Promise<void> {
+    async openMainWindow(route?: string): Promise<void> {
       await ready();
+      if (route) window.location.hash = route;
       await invoke('open_main_window');
     },
 
@@ -647,4 +640,7 @@ export async function createDesktopClient(): Promise<AppRPCClient> {
       void invoke('log_frontend', { message }).catch(() => undefined);
     },
   };
+
+  await setupTrayBridge(api);
+  return api;
 }

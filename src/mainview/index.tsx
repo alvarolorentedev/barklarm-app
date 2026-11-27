@@ -19,7 +19,6 @@ window.addEventListener('unhandledrejection', (event) => {
 if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) {
   document.documentElement.classList.add('platform-darwin');
 }
-document.documentElement.dataset.runtime = import.meta.env.MODE === 'mock' ? 'mock' : 'desktop';
 
 const container = document.getElementById('root');
 if (!container) {

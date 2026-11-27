@@ -1,4 +1,5 @@
 import type { AppRPCClient } from './runtime/types';
+import { isTrayWindow } from './window';
 
 let implementation: AppRPCClient | null = null;
 let initializing: Promise<AppRPCClient> | null = null;
@@ -14,6 +15,10 @@ async function getClient(): Promise<AppRPCClient> {
       if (isMockRuntime()) {
         const { createMockClient } = await import('./runtime/mock');
         return createMockClient();
+      }
+      if (isTrayWindow()) {
+        const { createTrayClient } = await import('./desktop/tray-client');
+        return createTrayClient();
       }
       const { createDesktopClient } = await import('./desktop/client');
       return createDesktopClient();
@@ -59,9 +64,7 @@ export const client: AppRPCClient = {
   testInferenceProvider: (input) => call((runtime) => runtime.testInferenceProvider(input)),
   writeClipboard: (text) => call((runtime) => runtime.writeClipboard(text)),
   openIssue: (observerId) => call((runtime) => runtime.openIssue(observerId)),
-  getWindowMode: () => call((runtime) => runtime.getWindowMode()),
-  onWindowModeChange: (handler) => call((runtime) => runtime.onWindowModeChange(handler)),
-  openMainWindow: () => call((runtime) => runtime.openMainWindow()),
+  openMainWindow: (route) => call((runtime) => runtime.openMainWindow(route)),
   hideWindow: () => call((runtime) => runtime.hideWindow()),
   setTrayPanelHeight: (height) => call((runtime) => runtime.setTrayPanelHeight(height)),
   listBrowsers: () => call((runtime) => runtime.listBrowsers()),

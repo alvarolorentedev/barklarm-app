@@ -108,27 +108,29 @@ observer row to inspect the evidence panel. None of these scenarios make network
 ### Routes and tray mock
 
 The full window opens on `/radiator` and also exposes `/radiator/observer/:id`, `/observers` and `/settings`.
-`/general` redirects to `/settings`. The tray overlay is a separate shell on `/tray`, `/tray/observer/:id` and
+`/general` redirects to `/settings`. The dedicated tray window renders `/tray`, `/tray/observer/:id` and
 `/tray/handoff/:id`.
 
-In the browser mock the overlay is reachable directly; native window sizing and tray clicks are not simulated:
+In the browser mock the tray window is reachable directly with `window=tray`; native window sizing, the RPC bridge
+and tray clicks are not simulated:
 
 ```text
-http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray
-http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray/observer/mock-mixed-ci
-http://127.0.0.1:1420/?scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-ci
+http://127.0.0.1:1420/?window=tray&scenario=radiator-mixed&reset=1#/tray
+http://127.0.0.1:1420/?window=tray&scenario=radiator-mixed&reset=1#/tray/observer/mock-mixed-ci
+http://127.0.0.1:1420/?window=tray&scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-ci
 ```
 
-In the native app, clicking the menu-bar icon toggles one overlay. There is no second right-click menu design on
+In the native app, clicking the menu-bar icon toggles the dedicated `tray` window. The `main` window stays separate
+and decorated; it owns polling, evidence, analysis, notifications and the tray icon. The tray reads that state through
+an allowlisted local RPC bridge and never creates a second manager. There is no second right-click menu design on
 macOS/Windows. Linux keeps a minimal native menu fallback because Tauri cannot emit tray click events there.
 
-Keep `dragDropEnabled: false` on the main Tauri window. The Observers page adds a source by dropping a link and uses
-HTML5 drag and drop; Tauri's native handler consumes the drop and no native listener is registered.
+Keep `dragDropEnabled: false` on both Tauri windows. The Observers page adds a source by dropping a link and uses HTML5
+drag and drop; Tauri's native handler consumes the drop and no native listener is registered.
 
-The main window is created transparent so tray mode can apply the native `Popover` material (Acrylic on Windows) in
-`show_tray_panel`; `restore_main_window` clears the effect. The opaque app shell covers the main window, so keep its
-background and the `html[data-runtime='mock']` fallback if you change the theme tokens. The tray icon uses the fixed
-`barklarm-tray` id so a dev page reload replaces it instead of leaving duplicate menu-bar icons.
+The tray icon uses the fixed `barklarm-tray` id so a dev page reload replaces it instead of leaving duplicate menu-bar
+icons. External links opened from the tray are proxied to the main client, so the configured browser selection and its
+fallback behavior remain authoritative.
 
 ### Visual capture
 

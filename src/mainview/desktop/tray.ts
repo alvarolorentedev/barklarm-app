@@ -95,15 +95,8 @@ async function toggleTrayPanel(event: {
   rect?: { position: { x: number; y: number }; size: { width: number; height: number } };
 }): Promise<void> {
   try {
-    const mode = await invoke<string>('get_window_mode');
-    if (mode === 'tray') {
-      await invoke('hide_window');
-      return;
-    }
-    // A tray click always opens the overlay, even when the main window is visible.
     if (!event.rect) return;
-    window.location.hash = '#/tray';
-    await invoke('show_tray_panel', {
+    await invoke('toggle_tray_window', {
       x: event.rect.position.x,
       y: event.rect.position.y,
       width: event.rect.size.width,

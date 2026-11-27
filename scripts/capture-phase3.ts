@@ -53,14 +53,14 @@ const shots: Shot[] = [
   },
   {
     name: 'tray-dark-380',
-    path: '/?scenario=radiator-mixed&reset=1#/tray',
+    path: '/?window=tray&scenario=radiator-mixed&reset=1#/tray',
     width: 380,
     height: 520,
     ready: '.radiator-summary',
   },
   {
     name: 'tray-light-380',
-    path: '/?scenario=radiator-mixed&reset=1#/tray',
+    path: '/?window=tray&scenario=radiator-mixed&reset=1#/tray',
     width: 380,
     height: 520,
     light: true,
@@ -68,28 +68,28 @@ const shots: Shot[] = [
   },
   {
     name: 'tray-detail-dark-380',
-    path: '/?scenario=radiator-mixed&reset=1#/tray/observer/mock-mixed-ci',
+    path: '/?window=tray&scenario=radiator-mixed&reset=1#/tray/observer/mock-mixed-ci',
     width: 380,
     height: 440,
     ready: 'text=What happened',
   },
   {
     name: 'tray-handoff-dark-380',
-    path: '/?scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-ci',
+    path: '/?window=tray&scenario=radiator-mixed&reset=1#/tray/handoff/mock-mixed-ci',
     width: 380,
     height: 520,
     ready: '#handoff-preview',
   },
   {
     name: 'tray-healthy-dark-380',
-    path: '/?scenario=healthy&reset=1#/tray',
+    path: '/?window=tray&scenario=healthy&reset=1#/tray',
     width: 380,
     height: 240,
     ready: '.radiator-summary.is-compact',
   },
   {
     name: 'tray-empty-dark-380',
-    path: '/?scenario=empty&reset=1#/tray',
+    path: '/?window=tray&scenario=empty&reset=1#/tray',
     width: 380,
     height: 200,
     ready: 'text=No observers yet',
@@ -111,8 +111,7 @@ for (const shot of shots) {
   if (shot.path.includes('#/tray')) {
     const measured = await page.evaluate(() => {
       const content = document.querySelector<HTMLElement>('.tray-content');
-      const footer = document.querySelector<HTMLElement>('.tray-footer');
-      return Math.min(520, Math.max(200, 20 + (content?.scrollHeight || 0) + (footer?.offsetHeight || 0)));
+      return Math.min(520, Math.max(200, 86 + (content?.scrollHeight || 0)));
     });
     await page.setViewportSize({ width: shot.width, height: measured });
   }
